@@ -1,0 +1,1206 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kuzgun Haber</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Düzen: canlı haber uygulaması. Üstte yapışkan başlık + son dakika şeridi + sekmeler;
+   altta manşet + akış, sağda (mobilde manşetin altında) piyasa / lig / hava panoları. */
+:root{
+  --bg:#f3f2f7; --surface:#ffffff; --sunk:#eae8f1; --ink:#1c1a29; --muted:#676379; --line:#dfdcea;
+  --accent:#3b3fae; --accent-ink:#ffffff; --alert:#c4122f; --gold:#a8670f; --up:#127a4a; --down:#c4122f;
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --text:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121119; --surface:#1b1a25; --sunk:#23222f; --ink:#ecebf4; --muted:#9b97ae; --line:#2e2c3d;
+  --accent:#9296ff; --accent-ink:#121119; --alert:#ff5b70; --gold:#e3a94b; --up:#4fd18f; --down:#ff6b7d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121119; --surface:#1b1a25; --sunk:#23222f; --ink:#ecebf4; --muted:#9b97ae; --line:#2e2c3d;
+  --accent:#9296ff; --accent-ink:#121119; --alert:#ff5b70; --gold:#e3a94b; --up:#4fd18f; --down:#ff6b7d; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--display);-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.num{font-variant-numeric:tabular-nums}
+
+/* Başlık */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:12px;padding-block:10px}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit;min-width:0}
+.brand svg{flex:none}
+.brand b{font:800 23px/1 var(--display);letter-spacing:-.02em}
+.brand small{display:block;font:500 11px/1.2 var(--display);color:var(--muted);letter-spacing:.02em}
+.date{margin-left:auto;text-align:right;font-size:12px;color:var(--muted);line-height:1.3;white-space:nowrap}
+.date strong{display:block;color:var(--ink);font:600 13px/1.3 var(--mono)}
+.controls{display:flex;align-items:center;gap:6px}
+.live{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--alert);
+  border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:none;cursor:pointer}
+.live i{width:8px;height:8px;border-radius:50%;background:currentColor;animation:pulse 1.6s infinite}
+.live.off{color:var(--muted)} .live.off i{animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+select.speed{font:500 12px var(--display);color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+
+/* Son dakika şeridi */
+.ticker{background:var(--ink);color:var(--bg);overflow:hidden;display:flex;align-items:stretch;font-size:13px}
+.ticker .lab{flex:none;background:var(--alert);color:#fff;font:700 11px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;padding:9px 12px;display:flex;align-items:center}
+.ticker .rail{overflow:hidden;flex:1;min-width:0;display:flex;align-items:center}
+.ticker .track{display:inline-flex;white-space:nowrap;gap:36px;padding-left:24px;animation:slide 70s linear infinite}
+.ticker .track span{cursor:pointer}
+.ticker .track span::before{content:"◆";color:var(--alert);margin-right:10px;font-size:9px;vertical-align:2px}
+.ticker:hover .track{animation-play-state:paused}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* Sekmeler */
+nav.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-block:8px}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{flex:none;border:0;background:none;padding:7px 12px;border-radius:999px;font-weight:500;font-size:14px;color:var(--muted);cursor:pointer}
+nav.tabs button:hover{color:var(--ink)}
+nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+nav.tabs button .ct{font:600 10px var(--mono);margin-left:5px;opacity:.7}
+
+/* Ana düzen */
+main.layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;grid-template-areas:"top side" "list side";gap:22px 28px;padding-block:20px 40px;align-items:start}
+#topArea{grid-area:top;min-width:0}
+#side{grid-area:side;display:grid;gap:18px;min-width:0}
+#listArea{grid-area:list;min-width:0}
+@media (max-width:900px){
+  main.layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "side" "list"}
+  #side{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+}
+
+/* Kartlar */
+.img{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:var(--r);overflow:hidden;background:var(--sunk)}
+.img svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.cap{position:absolute;left:8px;bottom:8px;font:500 10px/1 var(--mono);color:#fff;background:rgba(0,0,0,.45);padding:4px 6px;border-radius:4px;letter-spacing:.02em}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:12px;color:var(--muted)}
+.cat{font:700 11px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.chip{font:700 10px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;padding:4px 6px;border-radius:4px}
+.chip.brk{background:var(--alert);color:#fff}
+.chip.dev{background:none;color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+article.story{cursor:pointer}
+article.story h2,article.story h3{margin:0;text-wrap:balance;letter-spacing:-.01em}
+article.story:hover h2,article.story:hover h3{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+article.story.read h3{color:var(--muted)}
+.lead{display:grid;gap:12px}
+.lead h2{font:800 clamp(25px,3.6vw,38px)/1.08 var(--display)}
+.lead p{margin:0;font:400 17px/1.5 var(--text);color:var(--muted);max-width:65ch}
+.mids{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.mid{display:grid;gap:9px;align-content:start}
+.mid h3{font:700 19px/1.2 var(--display)}
+@media (max-width:560px){.mids{grid-template-columns:minmax(0,1fr)}}
+.listhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 4px;font:700 13px/1 var(--display);letter-spacing:.08em;text-transform:uppercase}
+.listhead span{font:500 12px var(--display);letter-spacing:0;text-transform:none;color:var(--muted)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:16px;padding-block:16px;border-bottom:1px solid var(--line);align-items:start}
+.row h3{font:700 17px/1.25 var(--display);margin-block:6px 6px}
+.row p{margin:0;font:400 14.5px/1.45 var(--text);color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.row .img{border-radius:8px}
+@media (max-width:480px){.row{grid-template-columns:minmax(0,1fr) 96px;gap:12px}.row p{display:none}}
+.fresh{animation:fresh 2.4s ease-out}
+@keyframes fresh{0%{background:color-mix(in srgb,var(--accent) 16%,transparent)}100%{background:transparent}}
+.empty{padding:40px 0;color:var(--muted);text-align:center}
+
+/* Panolar */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.panel h4{margin:0 0 10px;font:700 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;display:flex;justify-content:space-between;gap:8px}
+.panel h4 span{font:500 11px var(--display);letter-spacing:0;text-transform:none;color:var(--muted)}
+.mk{display:grid;grid-template-columns:minmax(0,1fr) 64px auto;gap:10px;align-items:center;padding-block:6px;border-top:1px solid var(--line)}
+.mk:first-of-type{border-top:0}
+.mk .nm{font-size:13px;font-weight:500;line-height:1.2}
+.mk .nm small{display:block;color:var(--muted);font:400 11px var(--mono)}
+.mk .px{text-align:right;font:600 13px/1.2 var(--mono)}
+.mk .px small{display:block;font:500 11px var(--mono)}
+.up{color:var(--up)} .down{color:var(--down)}
+.mk svg{width:64px;height:24px;display:block}
+table.lg{width:100%;border-collapse:collapse;font-size:13px}
+table.lg th,table.lg td{padding-left:7px}
+table.lg th{font:600 10px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right;padding:0 0 6px}
+table.lg th:nth-child(2){text-align:left}
+table.lg td{padding:5px 0;border-top:1px solid var(--line);text-align:right;font-family:var(--mono);font-size:12px}
+table.lg td:nth-child(1){color:var(--muted);width:20px;text-align:left}
+table.lg td:nth-child(2){text-align:left;font-family:var(--display);font-size:13px}
+table.lg td:last-child{font-weight:600}
+.wx{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;padding-block:5px;border-top:1px solid var(--line);font-size:13px}
+.wx:first-of-type{border-top:0}
+.wx small{display:block;color:var(--muted);font-size:11.5px;line-height:1.25}
+.wx b{font:600 14px var(--mono)}
+.wx svg{width:22px;height:22px;color:var(--accent)}
+.moons{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.moon{display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.25}
+.moon small{display:block;color:var(--muted);font-size:11.5px}
+ol.pop{margin:0;padding:0;list-style:none;counter-reset:p;display:grid}
+ol.pop li{counter-increment:p;display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding-block:7px;border-top:1px solid var(--line);font-size:13.5px;line-height:1.3;cursor:pointer}
+ol.pop li:first-child{border-top:0}
+ol.pop li::before{content:counter(p);font:700 15px/1.2 var(--display);color:var(--accent)}
+ol.pop li:hover span{text-decoration:underline}
+
+/* Yeni haber hapı, son dakika bildirimi */
+.pill{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 132px);z-index:25;border:0;border-radius:999px;
+  background:var(--accent);color:var(--accent-ink);font:600 13px var(--display);padding:9px 16px;box-shadow:0 6px 20px rgba(0,0,0,.18);cursor:pointer}
+.toast{position:fixed;z-index:40;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
+  max-width:560px;margin:0 auto;background:var(--ink);color:var(--bg);border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.28);cursor:pointer;transform:translateY(140%);transition:transform .35s ease}
+.toast.show{transform:none}
+.toast b{flex:none;background:var(--alert);color:#fff;font:700 10px/1 var(--display);letter-spacing:.1em;padding:6px 7px;border-radius:4px}
+.toast span{font-weight:600;font-size:14px;line-height:1.3}
+
+/* Haber okuma ekranı */
+.reader{position:fixed;inset:0;z-index:50;background:rgba(10,9,16,.55);display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;
+  padding-top:calc(env(safe-area-inset-top,0px) + 24px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.sheet{background:var(--surface);border-radius:16px;width:100%;max-width:760px;padding:22px clamp(18px,4vw,40px) 34px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.close{position:sticky;top:0;float:right;margin:-6px -14px 0 0;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1;cursor:pointer;z-index:2}
+.sheet h1{font:800 clamp(26px,4.2vw,40px)/1.08 var(--display);letter-spacing:-.015em;margin:10px 0 12px;text-wrap:balance}
+.sheet .dek{font:400 19px/1.45 var(--text);color:var(--muted);margin:0 0 16px}
+.byline{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);padding-block:12px;border-block:1px solid var(--line);margin-bottom:18px}
+.byline b{color:var(--ink);font-weight:600}
+.sheet .img{margin-bottom:6px}
+.figcap{font-size:12px;color:var(--muted);margin:0 0 20px}
+.body p{font:400 18px/1.65 var(--text);margin:0 0 1em;max-width:65ch}
+.body p:first-child::first-line{font-weight:600}
+.dl{font:700 13px var(--display);letter-spacing:.06em;text-transform:uppercase}
+blockquote{margin:1.4em 0;padding:0 0 0 18px;border-left:3px solid var(--accent);font:600 21px/1.4 var(--text);max-width:60ch}
+blockquote cite{display:block;margin-top:8px;font:500 13px var(--display);font-style:normal;color:var(--muted)}
+.timeline{margin-top:26px;padding:16px 18px;background:var(--sunk);border-radius:12px}
+.timeline h5,.related h5{margin:0 0 10px;font:700 12px var(--display);letter-spacing:.08em;text-transform:uppercase}
+.timeline h5{color:var(--gold)}
+.timeline ol{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.timeline li{display:grid;grid-template-columns:60px minmax(0,1fr);gap:10px;font-size:14px;line-height:1.35}
+.timeline li time{font:500 12px var(--mono);color:var(--muted);padding-top:2px}
+.timeline li.cur{font-weight:700}
+.timeline li a{color:inherit;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.timeline li.next{color:var(--muted);font-style:italic}
+.related{margin-top:26px}
+.related ul{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.related li{padding-block:9px;border-top:1px solid var(--line);font-weight:600;font-size:15px;line-height:1.3;cursor:pointer}
+.related li:hover{text-decoration:underline}
+footer.foot{border-top:1px solid var(--line);color:var(--muted);font-size:12px;padding-block:18px 28px}
+
+@media (max-width:640px){
+  .date span.long{display:none}
+  .brand small{display:none}
+  .speed{display:none}
+  .pill{top:calc(env(safe-area-inset-top,0px) + 124px)}
+}
+@media (max-width:400px){ .date{display:none} }
+@media (prefers-reduced-motion: reduce){
+  .ticker .track{animation:none}
+  .ticker .rail{overflow-x:auto}
+  .live i,.fresh{animation:none}
+  .toast{transition:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="#" id="home" aria-label="Kuzgun Haber ana sayfa">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="9" fill="var(--ink)"/><path d="M7 21c4-1 7-4 9-8 2-3 5-5 9-4l3 1-3 1c-1 3-3 6-6 8l3 5-5-3c-3 1-6 1-10 0z" fill="var(--bg)"/><circle cx="23" cy="11" r="1.2" fill="var(--ink)"/></svg>
+      <span><b>Kuzgun</b><small>Esrâvan'ın haber ajansı · 1061'den beri</small></span>
+    </a>
+    <div class="date" aria-live="off"><strong id="clock">--:--</strong><span id="wdate"></span></div>
+    <div class="controls">
+      <select class="speed" id="speed" aria-label="Haber akış hızı">
+        <option value="45">Akış: sakin</option>
+        <option value="20">Akış: normal</option>
+        <option value="8">Akış: hızlı</option>
+      </select>
+      <button class="live" id="live" aria-pressed="true" title="Akışı durdur / sürdür"><i></i><span>Canlı</span></button>
+    </div>
+  </div>
+  <div class="ticker" aria-label="Son dakika başlıkları">
+    <div class="lab">Son dakika</div>
+    <div class="rail"><div class="track" id="track"></div></div>
+  </div>
+  <nav class="wrap tabs" id="tabs" role="tablist" aria-label="Kategoriler"></nav>
+</header>
+
+<main class="wrap layout">
+  <section id="topArea" aria-label="Manşet"></section>
+  <aside id="side" aria-label="Panolar">
+    <section class="panel"><h4>Piyasalar <span>Lothra Rüzgâr Borsası · gümüş sikke</span></h4><div id="markets"></div></section>
+    <section class="panel"><h4>Grifon Ligi <span id="lgweek">Puan durumu</span></h4><div id="league"></div></section>
+    <section class="panel"><h4>En çok okunanlar <span>son haberler</span></h4><ol class="pop" id="popular"></ol></section>
+    <section class="panel"><h4>Hava durumu <span>Gökgözlem Divanı</span></h4><div id="weather"></div></section>
+    <section class="panel"><h4>Gökyüzü <span>bu gece</span></h4><div class="moons" id="moons"></div></section>
+  </aside>
+  <section id="listArea" aria-label="Haber akışı"></section>
+</main>
+<footer class="foot"><div class="wrap">Kuzgun Ajansı haberleri Esrâvan diyarlarından kuzgunla ulaşır. Esrâvan hayali bir dünyadır; bu sayfadaki her haber, kişi ve kurum kurgudur.</div></footer>
+
+<button class="pill" id="pill" hidden></button>
+<div class="toast" id="toast" role="status" aria-live="polite"><b>SON DAKİKA</b><span id="toastText"></span></div>
+<div class="reader" id="reader" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rTitle" id="sheet"></div></div>
+
+<script>
+"use strict";
+/* ============ Yardımcılar ============ */
+const $ = s => document.querySelector(s);
+const R = a => a[Math.floor(Math.random()*a.length)];
+const N = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+const chance = p => Math.random() < p;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = (n,d=0) => n.toLocaleString("tr-TR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const up = s => s.toLocaleUpperCase("tr-TR");
+const cap1 = s => s.charAt(0).toLocaleUpperCase("tr-TR") + s.slice(1);
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function pickN(a,n){return shuffle(a).slice(0,n)}
+
+/* Türkçe ek uyumu: sx("Ardenhal","loc") -> "Ardenhal'da" */
+function sx(w,k){
+  const last = w.trim().split(/\s+/).pop();
+  const proper = /^[A-ZÇĞİÖŞÜÂ]/.test(last);
+  const lw = last.toLocaleLowerCase("tr-TR");
+  const m = lw.match(/[aâeıioöuüû][^aâeıioöuüû]*$/);
+  const v = m ? m[0][0] : "e";
+  const back = "aâıouû".includes(v);
+  const two = back ? "a" : "e";
+  const four = "aâı".includes(v) ? "ı" : "ei".includes(v) ? "i" : "ouû".includes(v) ? "u" : "ü";
+  const ev = /[aâeıioöuüû]$/.test(lw);
+  const hard = /[fstkçşhp]$/.test(lw);
+  // iyelik ekiyle biten adlar (Gölgeleri, Loncası) kaynaştırma n'si alır: Gölgeleri'ni, Loncası'nda
+  if (/(lar|ler)[ıi]$|[aâeıioöuü]s[ıiuü]$/.test(lw)){
+    const P = {loc:"nd"+two, abl:"nd"+two+"n", dat:"n"+two, gen:"n"+four+"n", acc:"n"+four, ins:"yl"+two}[k];
+    return w + (proper ? "'" : "") + P;
+  }
+  const S = {loc:(hard?"t":"d")+two, abl:(hard?"t":"d")+two+"n", dat:(ev?"y":"")+two,
+    gen:ev?"n"+four+"n":four+"n", acc:(ev?"y":"")+four, ins:(ev?"y":"")+"l"+two}[k];
+  return w + (proper ? "'" : "") + S;
+}
+const loc=w=>sx(w,"loc"), abl=w=>sx(w,"abl"), dat=w=>sx(w,"dat"), gen=w=>sx(w,"gen"), acc=w=>sx(w,"acc"), ins=w=>sx(w,"ins");
+
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* ============ Dünya: Esrâvan ============ */
+const REALMS = [
+  {id:"velmor", name:"Velmor Krallığı", short:"Velmor", cap:"Ardenhal", ruler:"Kraliçe Isolde", dem:"Velmorlular", cities:["Ardenhal","Kuzgunhisar","Gümüşdere"]},
+  {id:"kazir", name:"Kâzır Sultanlığı", short:"Kâzır", cap:"Seyrâb", ruler:"Sultan Demirhan", dem:"Kâzırlılar", cities:["Seyrâb","Narlıkent","Tuzova"]},
+  {id:"tas", name:"Taşyürek Dağ Birliği", short:"Taşyürek", cap:"Demirkapı", ruler:"Ocakbaşı Brann Kılıçdemir", dem:"Taşyürekliler", cities:["Demirkapı","Örsdağ","Derinocak"]},
+  {id:"yap", name:"Yaprakhan Elf Konseyi", short:"Yaprakhan", cap:"Ayvadi", ruler:"Yüce Ozan Elaria", dem:"Yaprakhanlılar", cities:["Ayvadi","Gölgekoru","Sabahçiy"]},
+  {id:"lot", name:"Lothra Hava Cumhuriyeti", short:"Lothra", cap:"Lothra", ruler:"Başkonsül Mirel Aksöz", dem:"Lothralılar", cities:["Lothra","Bulutyaka"]},
+  {id:"kar", name:"Karakum Hanlığı", short:"Karakum", cap:"Kumbelen", ruler:"Kağan Tuğrul Yelesen", dem:"Karakumlular", cities:["Kumbelen","Yıldızkuyu"]},
+  {id:"sis", name:"Sisli Adalar Birliği", short:"Sisli Adalar", cap:"Mavikum", ruler:"Liman Lordu Corvin Hale", dem:"Adalılar", cities:["Mavikum","Fenerburun","Kırlangıç"]}
+];
+const ALLCITIES = REALMS.flatMap(r => r.cities.map(c => ({city:c, realm:r})));
+const FIRST = ["Arin","Belkıs","Corvin","Dilara","Eldric","Feyza","Garren","Hilal","Ilgaz","Jora","Kaan","Lenna","Mirza","Nalan","Oswin","Peri","Rüzgar","Selin","Talia","Umay","Vesna","Yavuz","Zerrin","Bran","Elif","Torvald","Ismet","Maren","Doruk","Ysolde"];
+const LAST = ["Taşkın","Demirtoprak","Ardıç","Sertkanat","Yıldızgören","Kalaycı","Gümüşdal","Fenerci","Ateşoğlu","Bulutsever","Karayel","Ormanlı","Tuzcu","Kılıçdemir","Mumcu","Kuyucu","Çanakçı","Sazlık","Örgüt","Pınarbaşı"];
+const PROF = ["fırıncı","balıkçı","emekli şövalye","nalbant","çırak büyücü","kervancı","han sahibi","kuzgun terbiyecisi","ebe cadı","köprü bekçisi","kâtip","simya öğrencisi","fener bekçisi","çoban","terzi","mahalle muhtarı"];
+const person = () => R(FIRST) + " " + R(LAST);
+const vox = (city) => `${person()}, ${R(PROF)}${city ? ` (${city})` : ""}`;
+const REPORTERS = ["Lira Kuzgunoğlu","Doran Akyel","Ece Mürekkep","Halvard Sis","Zeynep Kâtipzade","Pip Tüysüz","Osman Kanatlı","Mira Ayvadili"];
+const EXPERTS = {
+  dragon:"ejderha davranış uzmanı Meryl Taşkın", alchemy:"Kraliyet Simya Akademisi'nden Dr. Orhun Kalaycı", seer:"kâhin Nesrin Yıldızgören",
+  economy:"Lothra Rüzgâr Borsası analisti Ilgaz Bulutsever", law:"Ardenhal Kraliyet Mahkemesi avukatı Talia Ardıç", weather:"Gökgözlem Divanı sözcüsü Ismet Karayel",
+  history:"Yedi Kule tarihçisi Oswin Gümüşdal", guild:"Lonca sözcüsü Barnabas Kuyucu", sport:"Grifon Ligi yorumcusu Kaan Sertkanat"
+};
+const CATS = {
+  siyaset:{label:"Siyaset", scene:"castle"},
+  ekonomi:{label:"Ekonomi", scene:"market"},
+  buyu:{label:"Büyü & Bilim", scene:"arcane"},
+  spor:{label:"Spor", scene:"arena"},
+  kultur:{label:"Kültür & Magazin", scene:"festival"},
+  doga:{label:"Hava & Doğa", scene:"sky"},
+  asayis:{label:"Asayiş", scene:"night"}
+};
+const CLOSING = {
+  siyaset:["Kuzgun Ajansı gelişmeleri saraydan ve sınırdan takip ediyor.","Konuyla ilgili resmî açıklamanın yarın sabah çanlarından sonra yapılması bekleniyor.","Diplomatik kaynaklar, görüşmelerin kapalı kapılar ardında süreceğini belirtti."],
+  ekonomi:["Piyasaların gün boyu dalgalı seyretmesi bekleniyor.","Analistler, hafta sonuna kadar fiyatlarda yeni bir sıçrama olabileceği uyarısında bulundu.","Esrâvan Ticaret Birliği konuyla ilgili haftalık raporunu yarın yayımlayacak."],
+  buyu:["Akademi, çalışmanın tüm sonuçlarını gelecek ay Yedi Kule Bülteni'nde yayımlayacak.","Büyücüler Loncası, vatandaşları denenmemiş büyüleri evde tekrarlamamaları konusunda uyardı.","Araştırmacılar, deneylerin ikinci aşamasına bahar dolunayında geçmeyi planlıyor."],
+  spor:["Ligde bir sonraki hafta maçları iki ay doğduğunda başlayacak.","Kulüp yönetiminin konuyla ilgili açıklamayı yarın yapması bekleniyor.","Grifon Ligi Disiplin Kurulu dosyayı bu hafta görüşecek."],
+  kultur:["Etkinlik biletleri kuzgun postasıyla ya da han kapılarındaki gişelerden temin edilebiliyor.","Ozanlar Derneği, sezonun en çok konuşulan işlerini ay sonunda ödüllendirecek.","Sosyal kristal kürelerde konu saatlerdir en çok konuşulanlar arasında."],
+  doga:["Gökgözlem Divanı, vatandaşların güncel uyarıları şehir meydanlarındaki duyuru taşlarından takip etmesini istedi.","Uzmanlar, olağandışı durumların birkaç gün daha sürebileceğini belirtiyor.","Druid Meclisi bölgedeki gözlemlerini sürdürüyor."],
+  asayis:["Soruşturma sürüyor; muhafızlar tanıkların en yakın karakola başvurmasını istedi.","Şüphelilerin önümüzdeki hafta Kraliyet Mahkemesi'ne çıkarılması bekleniyor.","Bekçiler, gece devriyelerinin artırıldığını duyurdu."]
+};
+
+/* ============ Piyasalar, lig, hava ============ */
+const markets = [
+  {id:"eja", name:"Ejder Altını", code:"EJA", p:1284.5, d:2},
+  {id:"mana", name:"Mana Kristali", code:"MNK", p:342.1, d:2},
+  {id:"demir", name:"Cüce Demiri", code:"CDM", p:58.3, d:2},
+  {id:"ipek", name:"Elf İpeği", code:"EİP", p:911, d:1},
+  {id:"anka", name:"Anka Tüyü", code:"ANK", p:4420, d:0},
+  {id:"e7", name:"Esrâvan 7 Endeksi", code:"E7", p:10812, d:0}
+];
+markets.forEach(m => { m.hist = Array.from({length:40}, () => m.p); m.open = m.p; m.ref = m.p; });
+const mk = id => markets.find(m => m.id === id);
+function shock(id,pct){const m=mk(id); if(!m) return; m.p *= 1 + pct/100; m.hist.push(m.p); if(m.hist.length>40) m.hist.shift();}
+
+const TEAMS = ["Ardenhal Kartalları","Seyrâb Şahinleri","Demirkapı Örsleri","Lothra Bulut Avcıları","Mavikum Martıları","Ayvadi Yaprakları","Kumbelen Rüzgârları","Kuzgunhisar Gölgeleri"];
+let league = TEAMS.map(t => ({t, o:0, g:0, b:0, m:0, a:0, y:0, p:0}));
+let week = 1;
+
+const WX = [
+  {k:"sun", t:"Güneşli", w:6}, {k:"cloud", t:"Parçalı bulutlu", w:5}, {k:"rain", t:"Sağanak", w:3}, {k:"storm", t:"Gök gürültülü", w:1.5},
+  {k:"snow", t:"Kar", w:1}, {k:"mana", t:"Hafif mana fırtınası", w:1.2}, {k:"ash", t:"Kül yağışı ihtimali", w:.6},
+  {k:"frog", t:"Kurbağa yağışı uyarısı", w:.3}, {k:"fog", t:"Yoğun büyülü sis", w:1}
+];
+function pickW(){const s=WX.reduce((a,b)=>a+b.w,0);let r=Math.random()*s;for(const x of WX){if((r-=x.w)<0)return x}return WX[0]}
+const WXCITIES = [["Ardenhal",8],["Seyrâb",24],["Demirkapı",-3],["Ayvadi",14],["Lothra",2],["Kumbelen",31],["Mavikum",11]];
+let weather = WXCITIES.map(([c,b]) => { const w = pickW(); return {c, base:b, k:w.k, t:w.t, temp:b+N(-3,3)}; });
+
+/* ============ Takvim ============ */
+const MONTHS = ["Kar Ayı","Buz Ayı","Tohum Ayı","Çiçek Ayı","Yağmur Ayı","Kiraz Ayı","Güneş Ayı","Hasat Ayı","Üzüm Ayı","Kül Ayı","Sis Ayı","Fırtına Ayı"];
+const DAYS = ["Ay Günü","Ateş Günü","Su Günü","Ağaç Günü","Altın Günü","Toprak Günü","Güneş Günü"];
+function worldDate(d){
+  const y = d.getFullYear() - 839;
+  return {full:`${d.getDate()} ${MONTHS[d.getMonth()]} ${y} T.Y.`, day:DAYS[(d.getDay()+6)%7], short:`${d.getDate()} ${MONTHS[d.getMonth()].split(" ")[0]}`};
+}
+const hm = t => new Date(t).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
+function ago(t){
+  const s = (Date.now()-t)/1000;
+  if (s < 50) return "az önce";
+  if (s < 3600) return Math.round(s/60) + " dk önce";
+  if (s < 86400) return Math.round(s/3600) + " sa önce";
+  return worldDate(new Date(t)).short;
+}
+
+/* ============ Haber şablonları ============ */
+function A(cat, place, o){ return Object.assign({cat, place}, o); }
+
+const T = {
+siyaset: [
+  () => { const [a,b] = pickN(REALMS,2); const topic = R(["sınır geçitleri","ejderha avı kotaları","ortak kuzgun posta hattı","Gümüş Nehir'in suyunun paylaşımı","büyülü silahların denetimi","korsanlara karşı ortak donanma"]);
+    const host = R([a,b]); const n = N(2,4);
+    return A("siyaset", host.cap, {title:`${a.short} ile ${b.short} arasında ${topic} zirvesi başladı`,
+      summary:`${a.ruler} ve ${b.ruler}, ${loc(host.cap)} ${n} gün sürecek görüşmelerde ${topic} konusunu masaya yatırıyor.`,
+      paras:[`${a.ruler} ile ${b.ruler}, ${topic} konusundaki anlaşmazlığı çözmek için ${loc(host.cap)} bir araya geldi. Görüşmelerin ${n} gün sürmesi ve son gün ortak bir bildirgeyle tamamlanması planlanıyor.`,
+        `Saray kaynakları, ilk oturumun beklenenden uzun sürdüğünü ve heyetlerin akşam yemeğinde de pazarlığa devam ettiğini aktardı. Kapıda bekleyen kalabalık, iki diyarın bayraklarını birlikte sallayarak liderleri karşıladı.`,
+        `İki diyar arasındaki son büyük anlaşma, yedi yıl önce Kuzgunhisar Antlaşması ile imzalanmıştı.`],
+      quote:{q:R([`Masaya iyi niyetle oturduk, ama ${a.short} halkının çıkarlarından taviz vermeyeceğiz.`,`Bu zirve, iki diyar arasında yeni bir dönemin ilk adımı olabilir.`,`Kâğıt üzerinde değil, sahada sonuç görmek istiyoruz.`]), who:R([a.ruler,b.ruler, `${b.short} heyet başkanı ${person()}`])}}); },
+  () => { const r = R(REALMS); const d = R([
+      ["gece yarısından sonra yüksek sesli büyü yapılmasını yasaklayan","Ferman, mahallelerdeki gürültü şikâyetlerinin son bir yılda üç katına çıkmasının ardından hazırlandı."],
+      ["trollere köprü işletme ruhsatı veren","Ruhsat alan troller, geçiş ücretlerini meydanlardaki tarifeye göre almak zorunda olacak."],
+      ["ejderha sahiplerine yıllık uçuş ehliyeti zorunluluğu getiren","Ehliyet sınavında yazılı bölümün yanında alçak irtifada iniş testi de yapılacak."],
+      ["posta kuzgunlarına haftada bir gün izin hakkı tanıyan","Kuzgun Postacıları Derneği uzun süredir bu hakkın tanınması için kampanya yürütüyordu."],
+      ["hanlarda iksirin bardakla satılmasını yasaklayan","Bundan sonra iksirler yalnızca mühürlü şişelerde ve yaş sınırına uyularak satılabilecek."],
+      ["kale surlarına yazı yazanlara bir hafta sur temizliği cezası getiren","Ferman, özellikle çırak büyücülerin parlayan mürekkeple yazdığı sloganları hedef alıyor."]]);
+    return A("siyaset", r.cap, {title:`${r.ruler}, ${d[0]} fermanı imzaladı`, summary:`${r.name}'nda yeni düzenleme yarın sabahtan itibaren geçerli olacak. ${d[1]}`,
+      paras:[`${r.ruler}, ${d[0]} fermanı bugün öğle saatlerinde imzaladı. Ferman, ${loc(r.cap)} tellallar tarafından meydanlarda okunduktan sonra yürürlüğe girecek.`, d[1],
+        `Muhalefet temsilcileri fermanın aceleye getirildiğini savunurken, saray çevreleri düzenlemenin halktan gelen yoğun talep üzerine hazırlandığını belirtti.`],
+      quote:{q:R(["Bu karar, hepimizin daha huzurlu uyuması için alındı.","Yasanın ruhu cezalandırmak değil, düzeni korumak.","Uygulamada sorun çıkarsa geri adım atmaktan çekinmeyiz."]), who:`${r.short} saray sözcüsü ${person()}`},
+      quote2:{q:R(["Kimse bize sormadı, ama alışırız.","Bence geç bile kalındı.","İlk hafta kimse uymaz, sonra herkes uyar."]), who:vox(r.cap)}}); },
+  () => { const r = R(REALMS.filter(x=>x.id!=="kar")); const bill = R(["Uçan Halı Trafik Düzenlemesi","Büyülü Hayvan Hakları","Ortak Fener Vergisi","Lonca Şeffaflığı","Kayıp Eşyalar ve Lanetli Emanetler"]); const yes=N(40,70), no=N(20,50);
+    return A("siyaset", r.cap, {title:`${r.short} meclisinde "${bill}" tasarısı gergin geçti`, summary:`Saatlerce süren oturumun sonunda tasarı ${yes} kabul, ${no} ret oyuyla ${yes>no?"kabul edildi":"reddedildi"}.`,
+      paras:[`${r.short} meclisinde "${bill}" tasarısı üzerine yapılan görüşmeler gece geç saatlere kadar sürdü. Oylamada ${yes} üye kabul, ${no} üye ret oyu kullandı; tasarı ${yes>no?"kabul edildi":"meclisten geçemedi"}.`,
+        `Oturum sırasında bir üyenin kürsüdeki kum saatini ters çevirerek konuşma süresini uzatmaya çalışması kısa süreli bir arbedeye yol açtı. Meclis başkanı oturuma yarım saat ara vermek zorunda kaldı.`,
+        `Tasarının ${yes>no?"saraya gönderilmesi ve önümüzdeki ay yürürlüğe girmesi":"değiştirilerek gelecek sezon yeniden meclise getirilmesi"} bekleniyor.`],
+      quote:{q:R(["Bu tasarı halkın değil, loncaların işine yarıyor.","Bugün meclis, sağduyunun yanında durdu.","Bir sonraki oturumda bu konuya yeniden döneceğiz."]), who:`meclis üyesi ${person()}`}}); },
+  () => { const [a,b] = pickN(REALMS,2); const what = R(["bir masa örtüsüne yanlışlıkla aşk şiiri yazdığı","resmî yemekte ev sahibinin ejderhasına isim taktığı","saray bahçesindeki konuşan aynaya devlet sırrı anlattığı","tören sırasında yanlış marşı ıslıkla çaldığı"]);
+    return A("siyaset", b.cap, {title:`${a.short} elçisinin ${b.short} sarayındaki gafı diplomatik kriz çıkardı`, summary:`Elçinin ${what} ortaya çıktı. ${b.short} dışişleri açıklama istedi.`, breaking:chance(.3),
+      paras:[`${a.name} elçisinin ${loc(b.cap)} verilen resmî yemekte ${what} ortaya çıktı. Olay, saray görevlilerinin anlattıklarının kuzgun postasıyla şehre yayılmasının ardından gündeme oturdu.`,
+        `${b.short} dışişleri, elçiyi bugün saraya çağırarak yazılı açıklama istedi. ${a.short} cephesi ise olayın "abartıldığını" ve elçinin niyetinin tamamen dostane olduğunu savundu.`,
+        `Diplomasi çevrelerinde, elçinin önümüzdeki günlerde ülkesine geri çağrılabileceği konuşuluyor.`],
+      quote:{q:"Bu bir gaf değil, saygısızlıktır. Resmî bir özür bekliyoruz.", who:`${b.short} dışişleri sözcüsü ${person()}`}}); },
+  () => { const r = R(REALMS); const stance = R(["yeni ticaret yolu projesini","ejderha avı yasağını","saray masraflarının kısılmasını","lonca seçimlerinin halka açılmasını","komşu diyarla ortak para birimini"]); const pc = N(38,77);
+    return A("siyaset", r.cap, {title:`Anket: ${r.dem} ${stance} yüzde ${pc} oranında destekliyor`, summary:`Kuzgun Ajansı adına yapılan kamuoyu yoklamasında ${N(800,3000)} kişiye kapı kapı ulaşıldı.`,
+      paras:[`Kuzgun Ajansı adına ${r.name} genelinde yapılan kamuoyu yoklamasına göre ${r.dem} ${stance} yüzde ${pc} oranında destekliyor. Kararsızların oranı ise yüzde ${N(5,18)} olarak ölçüldü.`,
+        `Yoklama, ${N(9,40)} anketörün ${N(4,9)} şehirde kapı kapı dolaşmasıyla tamamlandı. Kırsal bölgelerde destek oranının şehirlere göre daha ${chance(.5)?"yüksek":"düşük"} olduğu görüldü.`,
+        `Sonuçların önümüzdeki hafta meclis görüşmelerinde sıkça anılması bekleniyor.`],
+      quote:{q:"Halkın nabzı belli. Siyasetçilerin bu rakamlara kulak vermesi gerekiyor.", who:`anket sorumlusu ${person()}`}}); }
+],
+ekonomi: [
+  () => { const c = R(ALLCITIES); const n = N(60,400); const good = R(["baharat","tuz","Elf ipeği","cüce demiri","kurutulmuş ejderha meyvesi","çöl camı"]); const pc = N(8,30);
+    return A("ekonomi", c.city, {title:`${n} develik kervan ${dat(c.city)} ulaştı; ${good} fiyatları yüzde ${pc} düştü`, summary:`Mevsimin en büyük kervanı, ${N(20,60)} günlük yolculuğun ardından şehrin doğu kapısından giriş yaptı.`,
+      paras:[`${n} deveden oluşan dev kervan bu sabah ${dat(c.city)} ulaştı. Kervanın getirdiği yüklerin pazara inmesiyle ${good} fiyatları gün içinde yüzde ${pc} geriledi.`,
+        `Kervanbaşı ${person()}, yolculuğun büyük bölümünün sorunsuz geçtiğini, yalnızca Karakum çölünde bir kum cinine yol hakkı olarak ${N(2,9)} çuval hurma verdiklerini anlattı.`,
+        `Pazar esnafı fiyat düşüşünden memnun değil. Bazı tüccarlar, ellerindeki stokları kervan şehirden ayrılana kadar satmayacaklarını söyledi.`],
+      quote:{q:R(["Bu fiyatlarla dükkânı kapatıp kervana katılmak daha kârlı olacak.","Halk için iyi haber, bizim için felaket.","Bir haftaya kalmaz fiyatlar yine çıkar."]), who:vox(c.city)}, market:{id:R(["ipek","demir"]), pct:-1.2}}); },
+  () => { const c = R(ALLCITIES); const g = R([["Köprü Trolleri Derneği","şehirdeki köprülerden geçişler durdu"],["Kuzgun Postacıları Sendikası","mektuplar ve gazeteler dağıtılamıyor"],["Fener Bekçileri Loncası","limandaki fenerler ilk kez yanmadı"],["Cüce Madenciler Birliği","demir ve mana kristali üretimi durma noktasına geldi"],["Lamba Yakıcılar Derneği","sokaklar gece boyunca karanlıkta kaldı"]]); const days=N(2,6);
+    return A("ekonomi", c.city, {title:`${g[0]} greve gitti: ${loc(c.city)} ${g[1]}`, summary:`Sendika, ücretlerin ${N(15,40)} yıldır artırılmadığını söyledi. Grevin ${days} gün sürmesi bekleniyor.`, breaking:chance(.25),
+      paras:[`${g[0]} üyeleri bu sabah itibarıyla iş bıraktı. Grev nedeniyle ${loc(c.city)} ${g[1]}.`,
+        `Sendika başkanı ${person()}, ücretlerin uzun süredir artırılmadığını ve çalışma koşullarının "bir gulyabaninin bile kabul etmeyeceği" seviyeye geldiğini söyledi. Yönetim ise taleplerin "hazineyi aşacağını" savunuyor.`,
+        `Arabulucu olarak atanan ${EXPERTS.guild}, tarafların ilk görüşmesinin yarın öğlen yapılacağını açıkladı.`],
+      quote:{q:"Haklarımızı alana kadar tek bir adım geri atmayacağız.", who:`grevci ${person()}`}, market:{id:g[0].includes("Madenci")?"demir":"e7", pct:g[0].includes("Madenci")?3.4:-0.8}}); },
+  () => { const c = R(ALLCITIES); const t = R(["uçan halı kiralama noktası","self servis iksir büfesi","ejderha yavrusu kreşi","kristal küre tamirhanesi","kuzgunla eve yemek teslimatı","24 saat açık simya eczanesi"]);
+    return A("ekonomi", c.city, {title:`${loc(c.city)} ilk ${t} açıldı`, summary:`Açılışın ilk gününde kuyruk ${N(2,5)} sokak öteye uzandı.`,
+      paras:[`${loc(c.city)} faaliyete geçen ilk ${t}, açılış gününde yoğun ilgi gördü. İşletmenin önündeki kuyruk öğle saatlerinde ${N(2,5)} sokak öteye kadar uzandı.`,
+        `İşletmenin sahibi ${person()}, fikrin aklına ${R(["bir rüyada","bir kuyruklu yıldız gecesinde","annesinin eski defterini okurken","Lothra'ya yaptığı bir yolculukta"])} geldiğini söyledi. Benzer şubelerin yıl sonuna kadar ${N(2,6)} şehirde daha açılması planlanıyor.`,
+        `Esrâvan Ticaret Birliği verilerine göre bu yıl açılan yeni işletme sayısı geçen yıla göre yüzde ${N(6,24)} arttı.`],
+      quote:{q:R(["İlk günden bu kadar ilgi beklemiyorduk.","Bu şehrin buna ihtiyacı vardı.","Rakiplerimiz şimdiden kapıda casus bekletiyor."]), who:`işletme sahibi ${person()}`}}); },
+  () => { const r = R(REALMS); const tax = R(["sihirli asa","baca","pencere","kuzgun","ejderha ahırı","ışınlanma"]); const pc = N(5,25);
+    return A("ekonomi", r.cap, {title:`${r.short} hazinesi ${tax} vergisini yüzde ${pc} artırdı`, summary:`Yeni oranlar gelecek dolunaydan itibaren uygulanacak. Hazine, ek gelirin yol ve köprü onarımlarına harcanacağını açıkladı.`,
+      paras:[`${r.name} hazinesi, ${tax} vergisini yüzde ${pc} artırma kararı aldı. Düzenleme gelecek dolunaydan itibaren geçerli olacak.`,
+        `Hazine nazırı, bu yıl ${N(3,12)} köprünün troller tarafından "aşırı kullanım" nedeniyle hasar gördüğünü, ek gelirin onarımlara aktarılacağını söyledi.`,
+        `Esnaf temsilcileri ise kararın zaten zor durumdaki küçük işletmeleri daha da sıkıştıracağı görüşünde.`],
+      quote:{q:"Vergiyi artırmak kolay; asıl mesele paranın nereye gittiğini göstermek.", who:EXPERTS.economy}, market:{id:"e7", pct:-0.6}}); },
+  () => { const m = R(markets.filter(x=>x.id!=="e7")); const why = R(["Derinocak madenlerinde yeni bir damar bulundu","Ayvadi'deki ipek böceği hasadı beklentileri aştı","Lothra Rüzgâr Borsası'nda yeni bir fon kuruldu","Seyrâb sarayı rezervlerini artırma kararı aldı"]);
+    return A("ekonomi", "Lothra", {title:`${m.name} vadeli işlemlerinde rekor hacim`, summary:`${why}; işlem hacmi tarihî zirveye çıktı.`,
+      paras:[`Lothra Rüzgâr Borsası'nda ${m.name} vadeli işlemleri, bugün tarihî zirveye ulaştı. Gün içinde el değiştiren sözleşme sayısı ${fmt(N(12000,90000))} oldu.`,
+        `Piyasa uzmanları hareketlenmeyi büyük ölçüde şu gelişmeye bağlıyor: ${why}.`,
+        `Borsa yönetimi, aşırı yoğunluk nedeniyle bulut asansörlerinin kapasitesini öğleden sonra iki katına çıkardı.`],
+      quote:{q:"Uzun zamandır böyle bir hareketlilik görmemiştik. Dikkatli olmakta fayda var.", who:EXPERTS.economy}, market:{id:m.id, pct:chance(.6)?N(10,30)/10:-N(10,25)/10}}); }
+],
+buyu: [
+  () => { const d = R([
+      ["altını kurşuna çevirmenin, kurşunu altına çevirmekten daha kolay olduğunu kanıtladı","Araştırmacılar, sonucun bilimsel açıdan önemli, ticari açıdan ise felaket olduğunu kabul ediyor."],
+      ["unutkanlık iksirinin hatırlama iksiriyle karıştırıldığında deja vu yarattığını keşfetti","Deneye katılan gönüllülerin tamamı, deneye daha önce katıldıklarını iddia etti."],
+      ["ejderha nefesinin ekmek mayasını üç kat hızlandırdığını buldu","Ardenhal fırıncıları sonucu büyük bir heyecanla karşıladı."],
+      ["görünmezlik pelerininin yıkandıktan sonra çekmesinin nedenini çözdü","Akademi, pelerinlerin ılık ay suyunda elde yıkanmasını öneriyor."],
+      ["konuşan aynaların yalnızca iltifat edebildiği efsanesini çürüttü","Testlerde aynaların yüzde 34'ünün açık sözlü eleştiri yaptığı görüldü."]]);
+    return A("buyu","Ardenhal", {title:`Kraliyet Simya Akademisi ${d[0]}`, summary:d[1], scene:"arcane",
+      paras:[`Ardenhal'deki Kraliyet Simya Akademisi'nde yürütülen ${N(2,9)} yıllık çalışmanın sonuçları açıklandı. Araştırma ekibi, ${d[0].replace("kanıtladı","kanıtladığını").replace("keşfetti","keşfettiğini").replace("buldu","bulduğunu").replace("çözdü","çözdüğünü").replace("çürüttü","çürüttüğünü")} duyurdu.`,
+        d[1],
+        `Çalışmanın hakem incelemesi, Yedi Kule'nin üç kıdemli büyücüsü tarafından yapıldı. Ekip, bulguların başka laboratuvarlarda da tekrarlanmasını bekliyor.`],
+      quote:{q:R(["Bilimde en heyecan verici an, 'Bu olmamalıydı' dediğiniz andır.","Sonuçlar, kadim kitaplarda yazılanların yarısının yeniden okunması gerektiğini gösteriyor.","Laboratuvarı iki kez havaya uçurduk, ama değdi."]), who:EXPERTS.alchemy}}); },
+  () => { const c = R(ALLCITIES); const e = R(["bir mahalledeki bütün kediler yarım gün boyunca kadim Elfçe konuştu","çeşmelerden iki saat boyunca ılık mercimek çorbası aktı","saat kulesi geriye doğru çalmaya başladı ve tüm şehir öğle yemeğini iki kez yedi","sokaktaki bütün şemsiyeler kendiliğinden açılıp uçmaya çalıştı","pazar yerindeki elmalar bir anda armuta dönüştü"]);
+    return A("buyu", c.city, {title:`${loc(c.city)} deneme büyüsü ters tepti: ${e.split(" ").slice(0,7).join(" ")}...`, summary:`Bir çırak büyücünün ödev olarak hazırladığı büyü, kontrolden çıktı: ${e}.`,
+      paras:[`${loc(c.city)} bir çırak büyücünün ödev olarak hazırladığı büyü beklenmedik sonuçlar doğurdu: ${e}.`,
+        `Olay yerine çağrılan Büyücüler Loncası ekibi, etkiyi ${N(1,5)} saat içinde tamamen ortadan kaldırdı. Yaralanan olmadığı, ancak ${R(["birkaç dükkânın vitrinine zarar geldiği","bir kedinin hâlâ ara ara Elfçe küfrettiği","bazı vatandaşların durumdan memnun kaldığı"])} bildirildi.`,
+        `Lonca, çıraklar için ev ödevi kurallarını gözden geçireceğini açıkladı.`],
+      quote:{q:R(["Ben sadece masamı toplamak istemiştim.","Hocam bu ödevden en az B alacağımı söylemişti."]), who:`çırak büyücü ${person()}`}, quote2:{q:"Kimseye zarar gelmediği için şanslıyız. Ama bu tür denemeler okul bahçesinde yapılmalı.", who:EXPERTS.guild}}); },
+  () => { const star = R(["Gümüş Kuyruk","Yaşlı Göz","Kızıl Gezgin","Ozan'ın Fenerİ".replace("İ","i")]); const y = N(76,412);
+    return A("buyu","Yıldızkuyu", {title:`${star} kuyruklu yıldızı ${y} yıl sonra yeniden görülecek`, summary:`Gökbilimciler, yıldızın önümüzdeki ${N(3,12)} gece boyunca çıplak gözle izlenebileceğini açıkladı.`, scene:"arcane",
+      paras:[`Karakum'daki Yıldızkuyu Rasathanesi, ${star} kuyruklu yıldızının ${y} yıl aradan sonra yeniden Esrâvan semalarına döneceğini duyurdu. Yıldızın en parlak hâline ${N(2,9)} gün içinde ulaşması bekleniyor.`,
+        `Kâhinler, kuyruklu yıldızın geçişini geleneksel olarak "değişim habercisi" olarak yorumluyor. Rasathane ise bu yorumların bilimsel bir temeli olmadığını hatırlattı.`,
+        `Gözlem için en iyi saatin, iki ayın da ufkun altına indiği gece yarısından sonrası olduğu belirtildi.`],
+      quote:{q:"Son geçişinde bir kral tahttan inmiş, bir göl kurumuştu. Ben yine de dilek tutmanızı öneririm.", who:EXPERTS.seer}}); },
+  () => { const inv = R(["buharla çalışan bulaşık golemi","kendi kendini bileyen balta","ateş tükürmeyen, yalnızca ısıtan cep ejderhası","yağmuru geri gönderen şemsiye","sahibinin sesini taklit eden kilit"]); const who=`mucit ${R(["Brann","Torvald","Hilde","Gorm"])} ${R(["Örsdöven","Kıvılcımsakal","Taşbilek"])}`;
+    return A("buyu","Demirkapı", {title:`Taşyürekli mucit ${inv} için patent aldı`, summary:`Cüce mucidin icadı, Demirkapı Patent Ocağı'ndan ${N(3,11)} yıllık incelemenin ardından onay aldı.`,
+      paras:[`Demirkapı Patent Ocağı, ${who} tarafından geliştirilen ${inv} için patent verdiğini açıkladı. Onay, ${N(3,11)} yıl süren testlerin ardından geldi.`,
+        `Mucit, ilk prototipin "atölyenin yarısını yaktığını", ancak ${N(40,200)}. denemede istediği sonuca ulaştığını anlattı. Seri üretimin gelecek yıl başlaması planlanıyor.`,
+        `Taşyürek, bu yıl Esrâvan'da en çok patent başvurusu yapılan diyar olma unvanını korudu.`],
+      quote:{q:"Cüceler sabırlıdır. Ama atölye komşularım o kadar sabırlı değil.", who:who}, market:{id:"demir", pct:0.8}}); },
+  () => { const b = R(["Kayıp Yüz Yıl Tarihi","Ejderhaların Dilbilgisi","Işınlanmanın Kısa Yolları","Elf Yemekleri Ansiklopedisi'nin Yasaklı Cildi"]);
+    return A("buyu","Ardenhal", {title:`Yedi Kule Kütüphanesi'nde kayıp sanılan "${b}" bulundu`, summary:`Kitap, kütüphanenin bodrumunda yanlış rafa yerleştirilmiş hâlde ${N(120,600)} yıl boyunca beklemiş.`,
+      paras:[`Yedi Kule Kütüphanesi'nde yürütülen sayım çalışması sırasında, ${N(120,600)} yıldır kayıp olduğu düşünülen "${b}" adlı eser bulundu. Kitabın bodrumdaki "Bahçecilik" rafında durduğu ortaya çıktı.`,
+        `Kütüphaneciler, eserin sayfalarının çoğunun sağlam olduğunu, ancak bazı bölümlerin kitap kurtları tarafından "okunduğunu" bildirdi.`,
+        `Eser, restorasyonun ardından ziyaretçilere camekân arkasından sergilenecek.`],
+      quote:{q:"Yüzyıllardır aradığımız kitap meğer bir kat aşağıdaymış. Bu, kütüphaneciliğin hem güzel hem acı yanı.", who:EXPERTS.history}}); }
+],
+spor: [
+  () => matchNews(),
+  () => matchNews(),
+  () => { const [from,to] = pickN(TEAMS,2); const pl = person(); const fee = N(8,90)*1000;
+    return A("spor", to.split(" ")[0], {title:`Grifon Ligi'nde dev transfer: ${pl} ${fmt(fee)} altına ${dat(to)}`, summary:`Yıldız binici, ${gen(from)} formasını ${N(3,8)} sezon taşıdıktan sonra yeni takımına imza attı.`,
+      paras:[`Grifon Ligi'nin en çok konuşulan binicilerinden ${pl}, ${fmt(fee)} ejder altını karşılığında ${dat(to)} transfer oldu. Sözleşmenin ${N(2,5)} sezonluk olduğu açıklandı.`,
+        `${pl}, geçen sezon ${N(12,40)} halka geçişi ile ligin en skorer binicileri arasında yer almıştı. Biniciyle birlikte grifonu ${R(["Fırtınapençe","Kül","Yıldırım","Gümüşkanat","Akbora"])} da yeni ahırına taşınacak.`,
+        `${from} taraftarları, transferin ardından kulüp binası önünde toplanarak yönetimi protesto etti.`],
+      quote:{q:R(["Yeni bir sayfa açmanın zamanı gelmişti. Grifonum da çok heyecanlı.","Bu kulübün kupaya ihtiyacı var, ben de bunun için buradayım."]), who:pl}, market:{id:"eja", pct:0.3}}); },
+  () => { const ev = R([["Kraken Güreşi Şampiyonası","Mavikum"],["Ejderha Kuyruğu Okçuluk Turnuvası","Ayvadi"],["Bulutlar Arası Halı Yarışı","Lothra"],["Çöl Rüzgârı Deve Maratonu","Kumbelen"],["Örs Kaldırma Kupası","Demirkapı"]]); const w = person();
+    return A("spor", ev[1], {title:`${ev[0]}'nda zafer ${gen(w)}`, summary:`${loc(ev[1])} düzenlenen yarışmada ${w}, ${N(12,80)} rakibini geride bıraktı.`,
+      paras:[`${loc(ev[1])} düzenlenen ${ev[0]}, ${gen(w)} zaferiyle sona erdi. ${w}, ${N(12,80)} rakibini geride bırakarak kariyerinin ${R(["ilk","ikinci","üçüncü","dördüncü"])} şampiyonluğunu kazandı.`,
+        `Final turu, ${R(["iki ayın da doğduğu","şiddetli bir mana rüzgârının estiği","sisin yoğunlaştığı"])} saatlerde yapıldı ve seyircilere nefes kesen anlar yaşattı.`,
+        `Şampiyon, ödül olarak ${N(500,5000)} ejder altını ile birlikte geleneksel ${R(["gümüş kupa","defne tacı","altın örs","kraken dişi kolye"])} aldı.`],
+      quote:{q:"Bu zaferi bana inanan herkese, özellikle de anneanneme adıyorum.", who:w}}); },
+  () => { const tm = R(TEAMS); const pl = person();
+    return A("spor", tm.split(" ")[0], {title:`${tm} binicisinin kanında hız iksiri izine rastlandı`, summary:`Grifon Ligi Etik Kurulu, ${pl} hakkında soruşturma başlattı. Binici iddiaları reddediyor.`, breaking:chance(.3),
+      paras:[`Grifon Ligi Etik Kurulu, ${tm} binicisi ${pl} ile ilgili soruşturma başlattı. Maç sonrası alınan örnekte yasaklı hız iksirine ait izler bulundu.`,
+        `Binicinin avukatı, iksirin "grifonun öksürük şurubu ile karıştırılmış olabileceğini" savundu. Kurulun ikinci örnek sonucunu ${N(3,10)} gün içinde açıklaması bekleniyor.`,
+        `Suçlu bulunması hâlinde ${pl} sezonun geri kalanında forma giyemeyecek.`],
+      quote:{q:"Hayatım boyunca papatya çayından başka bir şey içmedim. Adımı temize çıkaracağım.", who:pl}, quote2:{q:"Kurallar herkes için aynı. Sonuç ne olursa olsun açıklanacak.", who:EXPERTS.sport}}); }
+],
+kultur: [
+  () => { const bard = R(["Ozan Selene Kırlangıç","Lir ustası Ferhat Gümüştel","'Çöl Gülü' Leyla Kumbelen","Ozan Aldric Rüzgârsöz"]); const c = R(ALLCITIES); const n = fmt(N(4,40)*1000);
+    return A("kultur", c.city, {title:`${bard}, ${loc(c.city)} ${n} kişiye sahne aldı`, summary:`Konser, ozanın ${N(3,9)} yıllık aranın ardından verdiği ilk büyük gösteri oldu.`,
+      paras:[`${bard}, ${loc(c.city)} verdiği konserde ${n} kişiyle buluştu. Gösteri, ${N(3,9)} yıllık aranın ardından gerçekleşen ilk büyük konser olmasıyla dikkat çekti.`,
+        `Konserin en duygusal anı, ozanın "${R(["Ay Altında Son Kervan","Fenerci'nin Kızı","Ejderhanın Ninnisi","Gümüş Nehir'e Mektup"])}" şarkısını söylediği sırada yaşandı. Seyirciler, ellerindeki ateşböceği fenerlerini havaya kaldırdı.`,
+        `Ozanın, turnenin bir sonraki durağı olarak ${dat(R(ALLCITIES).city)} gideceği açıklandı.`],
+      quote:{q:R(["Bu şehrin sesi her zaman kalbimdeydi.","Bu akşam burada olan herkes artık şarkının bir parçası."]), who:bard}, quote2:{q:"Gözyaşlarımı tutamadım. Hayatımın akşamıydı.", who:vox(c.city)}}); },
+  () => { const a = R(["Velmor Prensi Aldwin","ünlü ozan Selene Kırlangıç","Kâzır Sultanı'nın yeğeni Şehzade Kerem","Lothra'nın en genç meclis üyesi Peri Bulutsever","Grifon Ligi yıldızı Rurik Sertkanat"]); const b = R(["bir Elf heykeltıraş","Sisli Adalar'ın ünlü korsan kaptanı Mira Kara","tanınmış simyacı Dilara Kalaycı","Taşyürekli mimar Hilde Örsdöven"]); const pl = R(["Ayvadi'nin ünlü çay bahçesinde","Mavikum limanında bir sandalda","Seyrâb çarşısında","Lothra'nın bulut terasında"]);
+    return A("kultur", "Ardenhal", {title:`${cap1(a)} ile ${b} ${pl} el ele görüntülendi`, summary:`Gözlemciler, çiftin ${N(2,4)} saat boyunca sohbet ettiğini ve ayrılırken aynı faytona bindiğini aktardı.`,
+      paras:[`${cap1(a)} ile ${b}, ${pl} el ele görüntülendi. Kristal küreyle çekilen görüntüler kısa sürede tüm diyarlara yayıldı.`,
+        `Saray çevreleri konu hakkında yorum yapmazken, yakın kaynaklar ikilinin "bir süredir mektuplaştığını" iddia etti.`,
+        `Magazin kâhinleri ise ilişkinin geleceği konusunda ikiye bölünmüş durumda.`],
+      quote:{q:"Yıldızlar bu birlikteliğin en az iki dolunay süreceğini söylüyor.", who:EXPERTS.seer}}); },
+  () => { const f = R(["Ay Şenliği","Hasat Ateşi","Fener Gecesi","Kuzgun Bayramı","Kar Ejderhası Festivali"]); const c = R(ALLCITIES);
+    return A("kultur", c.city, {title:`${f} ${loc(c.city)} renkli görüntülerle başladı`, summary:`Festival boyunca şehirde ${N(40,200)} etkinlik düzenlenecek. İlk gün ${fmt(N(10,90)*1000)} ziyaretçi bekleniyor.`,
+      paras:[`Geleneksel ${f}, ${loc(c.city)} düzenlenen açılış töreniyle başladı. Tören, şehrin en yaşlı sakini ${person()} tarafından yakılan ilk fenerle açıldı.`,
+        `Festival boyunca sokak tiyatroları, ozan yarışmaları ve ${R(["dev kazanlarda pişen ejderha biberi çorbası","Elf dansları","cüce bira tadımları","uçan halı gösterileri"])} ziyaretçileri bekliyor.`,
+        `Muhafızlar, kalabalık nedeniyle şehir merkezinin at arabası trafiğine kapatıldığını duyurdu.`],
+      quote:{q:"Her yıl daha kalabalık oluyor. Bu sene kuzenlerimin hepsi geldi, hanımız doldu taştı.", who:vox(c.city)}}); },
+  () => { const t = R(["ejderha pulu küpeler","yarı saydam görünmezlik pelerinleri","kristalli büyücü şapkaları","kuzgun tüyü yakalar","anka tüyü saç tokaları"]);
+    return A("kultur", "Ayvadi", {title:`Ayvadi Moda Haftası'nın gözdesi: ${t}`, summary:`Elf tasarımcıların bu sezon öne çıkardığı trend, Esrâvan genelindeki terzileri şimdiden harekete geçirdi.`,
+      paras:[`Ayvadi Moda Haftası'nda bu sezonun en dikkat çeken trendi ${t} oldu. Podyumda ${N(12,40)} tasarımcının koleksiyonu sergilendi.`,
+        `Tasarımcı ${person()}, "Esrâvan'ın yeni nesli hem gösterişli hem işlevsel parçalar istiyor" dedi. Koleksiyonların bir bölümü sezon sonunda Seyrâb ve Ardenhal'deki butiklerde satışa çıkacak.`,
+        `Moda haftası, son gün düzenlenecek Ay Işığı Defilesi ile sona erecek.`],
+      quote:{q:"Geçen sezon herkes kurbağa yeşili giyiyordu. Bu sezon ışıltı geri döndü.", who:`moda yazarı ${person()}`}, market:{id:R(["ipek","anka"]), pct:1.6}}); },
+  () => { const play = R(["Kırık Asa","Son Ejderhanın Vasiyeti","Lothra'dan Düşen Kız","Troll Köprüsünde Bir Gece"]); const c = R(ALLCITIES);
+    return A("kultur", c.city, {title:`"${play}" ${loc(c.city)} ayakta alkışlandı`, summary:`Gölge tiyatrosu topluluğunun yeni oyunu, galada ${N(5,15)} dakika boyunca alkış aldı.`,
+      paras:[`${c.city} Gölge Tiyatrosu'nun yeni oyunu "${play}", galasında seyircilerden ${N(5,15)} dakika süren bir alkış aldı.`,
+        `Oyunun yönetmeni ${person()}, hikâyenin ${R(["kendi büyükannesinden dinlediği bir masaldan","eski bir kuzgun mektubundan","Yedi Kule arşivindeki bir kayıttan"])} esinlendiğini anlattı. Özellikle büyülü ışıkla yapılan sahne geçişleri büyük beğeni topladı.`,
+        `Oyun, sezon boyunca haftada ${N(2,4)} akşam sahnelenecek.`],
+      quote:{q:"Yılın oyunu. Kesinlikle iki kez izlenmeli.", who:`tiyatro eleştirmeni ${person()}`}}); }
+],
+doga: [
+  () => { const r = R(REALMS); const ph = R([["mana fırtınası","Büyülü eşyaların kendiliğinden çalışabileceği, asaların kıvılcım çıkarabileceği belirtildi."],["ateş yağmuru","Vatandaşların saman çatılı ahırlardaki hayvanları taş binalara alması istendi."],["kurbağa yağışı","Yağışın zararsız olduğu, ancak kurbağaların toplanmasının belediye görevlilerine bırakılması gerektiği hatırlatıldı."],["kristal dolu","Dolu tanelerinin değerli olmadığı, toplayıp satmaya çalışanların dolandırıcılıkla suçlanabileceği uyarısı yapıldı."],["çift ay gelgiti","Kıyı mahallelerinde yaşayanların eşyalarını üst katlara taşıması tavsiye edildi."]]);
+    return A("doga", r.cap, {title:`Gökgözlem Divanı'ndan ${r.short} için ${ph[0]} uyarısı`, summary:`Uyarı yarın gün batımına kadar geçerli. ${ph[1]}`, breaking:chance(.35),
+      paras:[`Gökgözlem Divanı, ${r.name} genelinde ${ph[0]} beklendiği uyarısında bulundu. Uyarının yarın gün batımına kadar geçerli olacağı açıklandı.`,
+        ph[1], `Divan, olayın etkisinin özellikle ${R(r.cities)} çevresinde hissedileceğini, öğleden sonra saatlerinde zirveye ulaşacağını belirtti.`],
+      quote:{q:"Panik yapmaya gerek yok, ama tedbiri elden bırakmamak lazım.", who:EXPERTS.weather}, market:ph[0]==="mana fırtınası"?{id:"mana",pct:2.2}:null}); },
+  () => { const cr = R([["bir buz kurdu sürüsü","Kuzgunhisar"],["yaşlı bir orman ruhu","Gölgekoru"],["dev bir kum solucanı","Yıldızkuyu"],["bir mantikor","Tuzova"],["deniz kızları","Kırlangıç"],["bir taş dev","Örsdağ"]]);
+    return A("doga", cr[1], {title:`${cap1(cr[0])} ${cr[1]} yakınlarında görüldü`, summary:`Yerel halk, son ${N(2,6)} gündür bölgede olağandışı izler gördüğünü söylüyordu. Uzmanlar yakın temastan kaçınılmasını istedi.`,
+      paras:[`${cap1(cr[0])}, ${cr[1]} yakınlarında köylüler tarafından görüldü. Görüntüler kristal küreyle kaydedilerek Druid Meclisi'ne iletildi.`,
+        `Druid Meclisi, canlının bölgeye yiyecek arayışıyla gelmiş olabileceğini, insanlara karşı saldırgan bir davranış sergilemediğini açıkladı. Yine de çobanların sürülerini birkaç gün köye yakın otlatması önerildi.`,
+        `Bölgede son benzer gözlem ${N(8,60)} yıl önce kayda geçmişti.`],
+      quote:{q:R(["Sabah suya gittiğimde karşımdaydı. Bana baktı, ben ona baktım, sonra ikimiz de yolumuza devam ettik.","Köpeklerim bütün gece havladı. Şimdi nedenini anlıyorum."]), who:vox(cr[1])}}); },
+  () => { const b = R(["Anka kuşları","Gece kelebekleri","Göçmen grifonlar","Ateş balıkları"]); const d = N(9,30);
+    return A("doga", "Ayvadi", {title:`${b} bu yıl ${d} gün erken göç etti`, summary:`Druid Meclisi, erken göçün sert bir kışın habercisi olabileceğini belirtti.`,
+      paras:[`${b} bu yıl her zamankinden ${d} gün erken göç etmeye başladı. Göç, Ayvadi'nin kuzeyindeki gözlem kulesinden dün akşam kaydedildi.`,
+        `Druid Meclisi, erken göçün geçmişte genellikle sert bir kışın ardından geldiğini hatırlattı. Çiftçilere hasadı mümkün olduğunca erken tamamlamaları tavsiye edildi.`,
+        `Kuş gözlemcileri, göçün önümüzdeki hafta boyunca ${R(["Gümüş Nehir","Sisli Körfez","Kül Tepeleri"])} üzerinden izlenebileceğini söylüyor.`],
+      quote:{q:"Doğa bize bir şey söylüyor. Dinlemekte fayda var.", who:`Yüksek Druid ${person()}`}, market:b==="Anka kuşları"?{id:"anka",pct:2.5}:null}); },
+  () => { const c = R(["Örsdağ","Derinocak","Kumbelen"]); const mag = (N(30,58)/10).toFixed(1).replace(".",",");
+    return A("doga", c, {title:`${loc(c)} ${mag} büyüklüğünde sarsıntı: Taş dev uykusunda döndü`, summary:`Sarsıntı çevre şehirlerden de hissedildi. Can kaybı ya da ciddi hasar bildirilmedi.`, breaking:true,
+      paras:[`${loc(c)} sabaha karşı ${mag} büyüklüğünde bir sarsıntı meydana geldi. Gökgözlem Divanı, sarsıntının bölgedeki uyuyan taş devin uykusunda dönmesinden kaynaklandığını açıkladı.`,
+        `Sarsıntı nedeniyle bazı evlerde raflardaki iksir şişeleri devrildi, bir han bacası çöktü. Can kaybı ya da ciddi yaralanma bildirilmedi.`,
+        `Uzmanlar, taş devin yüzyılda ortalama ${N(2,5)} kez döndüğünü ve yeni bir sarsıntı beklenmediğini vurguladı.`],
+      quote:{q:"Dev yine yattığı yerden memnun değil anlaşılan. Ama endişelenecek bir durum yok.", who:EXPERTS.weather}}); }
+],
+asayis: [
+  () => { const c = R(ALLCITIES); const it = R(["Belediye Meclisi'nin sihirli anahtarı","Lonca binasındaki kristal küre","Kraliçe'nin gizli çay tarifi","şehir meydanındaki konuşan heykelin burnu","Fener Bekçileri'nin kutsal fitili"]);
+    return A("asayis", c.city, {title:`${loc(c.city)} ${it} çalındı`, summary:`Muhafızlar, hırsızın bir görünmezlik pelerini kullanmış olabileceğini düşünüyor. Olay yerinde yalnızca çamurlu ayak izleri bulundu.`,
+      paras:[`${loc(c.city)} ${it} dün gece çalındı. Olay, sabah nöbetini devralan muhafızlar tarafından fark edildi.`,
+        `Muhafız komutanı, hırsızın bir görünmezlik pelerini kullanmış olabileceğini, olay yerinde yalnızca ${R(["çamurlu ayak izleri","bir tutam kuzgun tüyü","yarım yenmiş bir elma","bir özür notu"])} bulunduğunu açıkladı.`,
+        `Çalınan eşyayı bulana ya da yerini bildirene ${fmt(N(1,20)*100)} gümüş sikke ödül verileceği duyuruldu.`],
+      quote:{q:"Hırsız ne kadar görünmez olursa olsun, sonunda bir iz bırakır. Onu bulacağız.", who:`muhafız komutanı ${person()}`}}); },
+  () => { const c = R(ALLCITIES); const n = N(4,23); const s = fmt(N(300,9000));
+    return A("asayis", c.city, {title:`Sahte iksir şebekesine operasyon: ${n} gözaltı`, summary:`${loc(c.city)} düzenlenen baskında ${s} şişe sahte gençlik ve aşk iksiri ele geçirildi.`,
+      paras:[`Muhafızlar, ${loc(c.city)} sahte iksir üreten bir şebekeye yönelik operasyon düzenledi. Baskında ${n} kişi gözaltına alındı, ${s} şişe sahte iksir ele geçirildi.`,
+        `Simya uzmanlarının yaptığı incelemede, "gençlik iksiri" diye satılan şişelerin büyük bölümünde renklendirilmiş kuyu suyu ve şeker bulunduğu belirlendi. Bazı şişelerdeki "aşk iksiri"nin ise kullanıcılarda yalnızca hıçkırık yaptığı tespit edildi.`,
+        `Yetkililer, iksirlerin yalnızca Lonca mührü taşıyan eczanelerden alınmasını tavsiye etti.`],
+      quote:{q:"Halkın sağlığıyla oynayanlara göz yummayacağız.", who:`muhafız komutanı ${person()}`}, quote2:{q:"İki şişe içtim, on yaş gençleşmedim ama çok hıçkırdım.", who:vox(c.city)}}); },
+  () => { const c = R(ALLCITIES);
+    return A("asayis", c.city, {title:`${loc(c.city)} hayalet kiracı ile ev sahibi mahkemelik oldu`, summary:`Ev sahibi, ${N(80,300)} yıldır kira ödemeyen hayaletin tahliyesini istiyor. Hayalet ise evin "aslında kendisine ait" olduğunu savunuyor.`,
+      paras:[`${loc(c.city)} bir ev sahibi, evinde ${N(80,300)} yıldır kira ödemeden yaşayan hayalet için tahliye davası açtı. Davanın ilk duruşması bugün görüldü.`,
+        `Mahkemeye bir medyum aracılığıyla ifade veren hayalet, evin yapımında çalıştığını ve "ücretinin hiç ödenmediğini" ileri sürdü. Hâkim, tapu kayıtlarının Yedi Kule arşivinden getirilmesine karar verdi.`,
+        `Hukukçular, davanın Esrâvan'da benzer anlaşmazlıklar için emsal oluşturabileceğini belirtiyor.`],
+      quote:{q:"Bu dava, ölümden sonra mülkiyet hakkı konusunda tarihî bir karar doğurabilir.", who:EXPERTS.law}}); },
+  () => { const ship = R(["Kara Martı","Kızıl Ahtapot","Sessiz Dul","Tuzlu Kemik"]);
+    return A("asayis", "Fenerburun", {title:`Sisli Adalar açıklarında "${ship}" korsanları bir ticaret gemisini soydu`, summary:`Korsanlar, gemideki ${R(["baharat","ipek","rom","kuzgun yemi"])} yükünün tamamına el koydu. Mürettebat sağ salim kıyıya ulaştı.`,
+      paras:[`Sisli Adalar açıklarında seyreden bir ticaret gemisi, "${ship}" adlı korsan gemisinin saldırısına uğradı. Korsanlar yoğun sisi fırsat bilerek gemiye çıktı.`,
+        `Mürettebat, korsanların "son derece kibar" davrandığını, yükü aldıktan sonra herkese birer bardak sıcak çay ikram ettiğini anlattı. Gemi, Fenerburun limanına sabah saatlerinde ulaştı.`,
+        `Liman Lordu Corvin Hale, korsanlara karşı devriyeleri artırma kararı aldı.`],
+      quote:{q:"Korsan dediğin böyle olur ama yine de malımızı istiyoruz.", who:`gemi kaptanı ${person()}`}}); }
+]
+};
+
+/* Grifon Ligi maçları: puan tablosunu da günceller */
+function matchNews(){
+  const [h,a] = pickN(league,2);
+  const sh = N(0,5), sa = N(0,5);
+  [h,a].forEach(x => x.o++);
+  h.a += sh; h.y += sa; a.a += sa; a.y += sh;
+  if (sh>sa){h.g++;a.m++;h.p+=3} else if (sa>sh){a.g++;h.m++;a.p+=3} else {h.b++;a.b++;h.p++;a.p++}
+  if (league.reduce((s,x)=>s+x.o,0) % 8 === 0) week++;
+  const city = h.t.split(" ")[0]; const star = person();
+  const res = sh===sa ? "berabere kaldı" : (sh>sa ? `${acc(a.t)} ${sh}-${sa} yendi` : `${dat(a.t)} ${sh}-${sa} yenildi`);
+  const title = sh===sa ? `${h.t} ile ${a.t} ${sh}-${sa} berabere kaldı` : (sh>sa ? `${h.t}, ${acc(a.t)} ${sh}-${sa} mağlup etti` : `${a.t} deplasmanda ${acc(h.t)} ${sa}-${sh} geçti`);
+  const big = Math.abs(sh-sa) >= 4;
+  return A("spor", city, {title, summary:`Grifon Ligi'nin ${week}. haftasında ${loc(city)} oynanan maçta ${star} ${N(1,Math.max(1,Math.max(sh,sa)))} halka geçişiyle öne çıktı.`,
+    paras:[`Grifon Ligi'nin ${week}. haftasında ${h.t}, kendi ahırında ${res}. Maç, ${loc(city)} ${fmt(N(6,30)*1000)} seyirci önünde oynandı.`,
+      `${R(["İlk yarıda","Maçın ilk dakikalarında","Güçlü rüzgâr altında başlayan maçta"])} ${R(["iki grifonun havada çarpışması nedeniyle oyun kısa süre durdu","hakem bulutların arkasında kalan halkayı görmek için iki kez tekrar izledi","ev sahibi taraftarlar ateşböceği fenerleriyle dev bir kartal figürü oluşturdu"])}. ${star}, özellikle son bölümde yaptığı alçak uçuşlarla maçın yıldızı oldu.`,
+      big ? `Farklı skor, ligde zirve yarışını da doğrudan etkiledi.` : `Sonucun ardından iki takım da puan tablosundaki yerini korumaya çalışacak.`],
+    quote:{q:R(["Grifonlarım bugün rüzgârı çok iyi okudu.","Hakem kararları maçın kaderini belirledi, bunu herkes gördü.","Bu ligde kolay maç yok. Puanı aldığımız için mutluyuz.","Taraftarımız bugün altıncı binicimizdi."]), who:`${R([h.t,a.t])} antrenörü ${person()}`}});
+}
+
+/* ============ Gelişen hikâyeler ============ */
+const ARCS = [
+ {id:"ejder", name:"Kuzey Ejderhalarının Göçü", cat:"doga", scene:"dragon", init:()=>({c:R(["Kuzgunhisar","Gümüşdere","Örsdağ"]), n:N(14,31), pl:R(["Kızılkaya Vadisi","Yanık Ova","Eski Ateş Gölü"])}),
+  stages:[
+   p=>A("doga","Kuzgunhisar",{title:`Kuzeyde olağandışı ejderha sürüsü: Gözcüler ${p.n} ejderha saydı`, summary:`Kuzey kulelerindeki gözcüler, sürünün güneye doğru ilerlediğini bildirdi. Bu büyüklükte bir sürü en son ${N(60,140)} yıl önce görülmüştü.`, breaking:true,
+     paras:[`Velmor'un kuzey sınırındaki gözcü kuleleri, dün gece yarısından itibaren güneye doğru ilerleyen ${p.n} ejderhalık bir sürü gözlemledi. Ejderha Gözetim Dairesi, sürünün izlediği rotayı haritalamaya başladı.`,
+       `Bu büyüklükte bir ejderha sürüsünün en son ${N(60,140)} yıl önce görüldüğü belirtiliyor. Gözcüler, sürünün şimdilik yüksek irtifada uçtuğunu ve yerleşim yerlerine yaklaşmadığını aktardı.`,
+       `Daire, vatandaşların sakin olmasını ve çatılardaki saman yığınlarını kaldırmasını istedi.`],
+     quote:{q:"Bu kadar ejderhayı bir arada görmek hem büyüleyici hem de ürkütücü. Göçün nedenini anlamamız gerekiyor.", who:EXPERTS.dragon}, market:{id:"eja",pct:1.8}}),
+   p=>A("doga",p.c,{title:`Ejderha sürüsü ${p.c} üzerinden geçti; şehir sabaha isle uyandı`, summary:`Sürü, şehrin üzerinden alçak irtifada geçti. Bacalardaki is ve kırık kiremitler dışında hasar bildirilmedi.`,
+     paras:[`${p.n} ejderhadan oluşan sürü, gece saatlerinde ${gen(p.c)} üzerinden alçak irtifada geçti. Şehir halkı sabah, çatıları ve sokakları ince bir is tabakasıyla kaplı buldu.`,
+       `Muhafızlar, ${N(12,80)} evin kiremitlerinin kırıldığını, bir değirmenin kanatlarının ise ejderha kanadının yarattığı rüzgârla ters dönmeye başladığını bildirdi. Can kaybı ya da yaralanma yok.`,
+       `Ejderha Gözetim Dairesi, sürünün güneybatı yönünde ilerlemeye devam ettiğini açıkladı.`],
+     quote:{q:"Gökyüzü bir anda karardı. Sonra sıcak bir rüzgâr esti ve hepsi geçip gitti. Çamaşırlarım kapkara oldu ama hayattayız.", who:vox(p.c)}}),
+   p=>A("siyaset","Ardenhal",{title:`Ejderha Gözetim Dairesi alarm seviyesini turuncuya yükseltti`, summary:`Karar sonrası Ejder Altını fiyatları sert yükseldi. Kraliçe Isolde, kriz masası kurulmasını istedi.`, breaking:true,
+     paras:[`Ejderha Gözetim Dairesi, kuzey ejderhalarının göçü nedeniyle alarm seviyesini sarıdan turuncuya yükseltti. Bu, Velmor tarihinde son ${N(20,50)} yılda ilk kez yapılan bir yükseltme.`,
+       `Kraliçe Isolde, sarayda bir kriz masası kurulmasını istedi. Kraliyet okçu birliklerinin "yalnızca gözlem amacıyla" kuzey kulelerine konuşlandırıldığı bildirildi.`,
+       `Kararın ardından Lothra Rüzgâr Borsası'nda Ejder Altını fiyatları gün içinde sert yükseldi. Uzmanlar, yatırımcıların belirsizlik dönemlerinde altına yöneldiğini hatırlattı.`],
+     quote:{q:"Ejderhalar şu ana kadar kimseye saldırmadı. Bu adım bir önlem, panik nedeni değil.", who:`Ejderha Gözetim Dairesi başkanı ${person()}`}, market:{id:"eja",pct:4.2}}),
+   p=>A("doga",p.c,{title:`Sürünün lideri ${dat(p.pl)} indi; bölge yasak alan ilan edildi`, summary:`Gözlemciler, sürü liderinin yumurtlamak için yuva kurduğunu doğruladı. Bölgeye girişler ${N(30,90)} gün süreyle yasaklandı.`,
+     paras:[`Ejderha sürüsünün lideri olduğu düşünülen dişi ejderha, dün akşam ${dat(p.pl)} indi. Gözlemciler, ejderhanın bölgede yuva kurmaya başladığını doğruladı.`,
+       `Velmor sarayı, ${loc(p.pl)} ve çevresindeki ${N(3,9)} köyde ${N(30,90)} gün süreyle yasak bölge uygulanacağını açıkladı. Köy halkının geçici olarak ${dat(p.c)} taşınması için kervanlar hazırlandı.`,
+       `Sürünün diğer üyeleri ise bölgenin üzerinde daireler çizerek nöbet tutuyor.`],
+     quote:{q:"Bir ejderha yuvasının yanında yaşamak istemezsiniz. Ama onları rahatsız etmezsek, onlar da bizi rahatsız etmez.", who:EXPERTS.dragon}}),
+   p=>A("doga","Ardenhal",{title:`Göçün nedeni anlaşıldı: Ateş Dağı'nda erken kış`, summary:`Uzmanlar, ejderhaların yuvalandığı Ateş Dağı'ndaki volkanik ısının erken soğumasının sürüyü güneye ittiğini açıkladı. Alarm seviyesi sarıya indirildi.`,
+     paras:[`Ejderha Gözetim Dairesi, kuzey ejderhalarının olağandışı göçünün nedenini açıkladı: Ejderhaların geleneksel yuvalama alanı olan Ateş Dağı'ndaki volkanik ısı, bu yıl beklenenden erken soğudu.`,
+       `Daire, sürünün ${loc(p.pl)} kış boyunca kalacağını ve baharda kuzeye döneceğini öngörüyor. Alarm seviyesi turuncudan sarıya indirildi.`,
+       `Açıklamanın ardından Ejder Altını fiyatları geriledi. Yetkililer, ejderha yuvasını uzaktan izlemek isteyenler için ${p.c} surlarına gözlem dürbünleri yerleştirileceğini duyurdu.`],
+     quote:{q:"Ejderhalar da bizim gibi üşür. Bu kış komşumuz olacaklar.", who:EXPERTS.dragon}, market:{id:"eja",pct:-3.1}})
+  ]},
+ {id:"tac", name:"Kayıp Taç Krizi", cat:"siyaset", scene:"castle", init:()=>({k:R(["Pamuk Hanım","Sir Mırnav","Duman Paşa","Leydi Pati"])}),
+  stages:[
+   p=>A("siyaset","Ardenhal",{title:`Ardenhal sarayında tören öncesi kriz: Kraliyet Tacı ortada yok`, summary:`Saray kaynakları, taç giyme yıldönümüne ${N(2,5)} gün kala tacın hazine odasında bulunmadığını öne sürdü.`, breaking:true,
+     paras:[`Velmor Kraliyet Tacı'nın, taç giyme yıldönümü törenine günler kala hazine odasında bulunmadığı iddia edildi. Saray kaynakları, durumun sabah sayımı sırasında fark edildiğini aktardı.`,
+       `Kraliyet muhafızlarının sarayın tüm çıkışlarını kontrol altına aldığı ve hazine odasına giriş yetkisi olan ${N(4,11)} kişinin ifadesine başvurulduğu öğrenildi.`,
+       `Tacın üzerindeki "Kuzey Yıldızı" elmasının tek başına bir kale değerinde olduğu tahmin ediliyor.`],
+     quote:{q:"Hazine odasının kilidi sağlam, pencere kapalı. Taç ise yok. Bu işte bir tuhaflık var.", who:`saray kaynağı (isim vermek istemedi)`}, market:{id:"e7",pct:-1.1}}),
+   p=>A("siyaset","Ardenhal",{title:`Saray sözcüsü iddiaları yalanladı: "Taç rutin cilada"`, summary:`Sözcü, tacın yıllık bakım için kuyumculara gönderildiğini söyledi. Ancak hangi kuyumcuya gönderildiği açıklanmadı.`,
+     paras:[`Velmor saray sözcüsü, Kraliyet Tacı'nın kaybolduğu yönündeki haberleri yalanladı. Sözcüye göre taç, tören öncesi her yıl yapıldığı gibi ciladadır.`,
+       `Ancak sözcü, tacın hangi kuyumcuya gönderildiği sorusuna "güvenlik nedeniyle" yanıt vermedi. Basın toplantısının yalnızca ${N(3,6)} dakika sürmesi, soru işaretlerini artırdı.`,
+       `Kraliçe Isolde ise bugün kamuoyu önüne çıkmadı.`],
+     quote:{q:"Taç güvende ve törende Majestelerinin başında olacak. Bu kadar.", who:`Velmor saray sözcüsü ${person()}`}}),
+   p=>A("ekonomi","Ardenhal",{title:`Kuyumcular Loncası: "Taç bizde değil, hiç gelmedi"`, summary:`Ardenhal'in tüm kraliyet kuyumcularını temsil eden lonca, sarayın açıklamasını doğrulamadı. Kriz derinleşiyor.`,
+     paras:[`Ardenhal Kuyumcular Loncası, Kraliyet Tacı'nın bakım için hiçbir üyesine gönderilmediğini açıkladı. Açıklama, sarayın "taç ciladadır" savunmasını boşa çıkardı.`,
+       `Lonca başkanı, saraydan son bir yıldır yalnızca "bir çift küpe ve kraliyet kedisinin tasması" için sipariş aldıklarını söyledi.`,
+       `Muhalefet, Kraliçe'den konuyla ilgili doğrudan bir açıklama yapmasını talep etti.`],
+     quote:{q:"Biz yalan söylemeyiz, mücevher söyler. Taç bizim tezgâhımıza hiç gelmedi.", who:`Kuyumcular Loncası başkanı ${person()}`}}),
+   p=>A("siyaset","Ardenhal",{title:`Kraliyet Tacı, saray kedisi ${gen(p.k)} yatağında bulundu`, summary:`Muhafızlar tacı, kedinin kadife yastığının altında buldu. Kedinin tacı haftalardır "yatak" olarak kullandığı anlaşıldı.`, breaking:true,
+     paras:[`Günlerdir aranan Velmor Kraliyet Tacı, saray kedisi ${gen(p.k)} kadife yatağının altında bulundu. Tacı, kedinin tüylerini taramaya gelen bir hizmetkâr fark etti.`,
+       `Saray kaynakları, ${gen(p.k)} tacı hazine odasının kedi kapısından "parlak olduğu için" taşıdığını ve haftalardır üzerinde uyuduğunu tahmin ediyor. Kuzey Yıldızı elmasının sağlam olduğu açıklandı.`,
+       `Kraliçe Isolde'nin olayı öğrendiğinde uzun süre güldüğü aktarıldı.`],
+     quote:{q:"Hazine odasının tüm kilitlerini kontrol ettik ama kedi kapısını hiç düşünmemiştik.", who:`muhafız komutanı ${person()}`}, market:{id:"e7",pct:1.2}}),
+   p=>A("kultur","Ardenhal",{title:`Taç töreni yapıldı; ${p.k} "Sadakat Nişanı" aldı`, summary:`Tören, ${fmt(N(20,60)*1000)} kişinin katılımıyla Ardenhal meydanında gerçekleşti. Kedinin nişanı Kraliçe tarafından takıldı.`,
+     paras:[`Velmor'da günlerdir süren taç krizi, Ardenhal meydanında yapılan görkemli bir törenle sona erdi. Kraliçe Isolde, tacı ${fmt(N(20,60)*1000)} kişinin önünde yeniden taktı.`,
+       `Törenin en çok alkış alan anı, saray kedisi ${dat(p.k)} "tacı kimsenin bulamayacağı kadar iyi koruduğu için" Sadakat Nişanı takılması oldu. ${p.k}, nişanı aldıktan hemen sonra kürsüde uykuya daldı.`,
+       `Saray, hazine odasındaki kedi kapısının kapatılacağını, ${p.k} için ise yeni ve "parlak" bir yatak yapılacağını duyurdu.`],
+     quote:{q:"Bir kraliçenin en sadık muhafızı bazen dört ayaklı olur.", who:"Kraliçe Isolde"}})
+  ]},
+ {id:"lothra", name:"Lothra Alçalıyor", cat:"buyu", scene:"floating", init:()=>({d:N(8,16)}),
+  stages:[
+   p=>A("siyaset","Lothra",{title:`Lothra bir gecede ${p.d} arşın alçaldı; Başkonsül olağanüstü toplantı çağrısı yaptı`, summary:`Havada yüzen şehrin yüksekliği, ölçüm kayıtlarının tutulmaya başlandığı günden bu yana ilk kez bu kadar hızlı düştü.`, breaking:true,
+     paras:[`Lothra Hava Cumhuriyeti, dün gece ${p.d} arşın alçaldı. Şehrin kenarındaki yükseklik taşları, sabah ölçümünde önceki günden belirgin biçimde düşük değerler gösterdi.`,
+       `Başkonsül Mirel Aksöz, meclisi olağanüstü toplantıya çağırdı. Bulut kenarındaki mahallelerde yaşayanların şehrin merkezine yakın bölgelere geçici olarak taşınması istendi.`,
+       `Lothralı mühendisler, alçalmanın nedenini bulmak için levitasyon taşlarının bulunduğu şehir tabanına indi.`],
+     quote:{q:"Şehrimiz güvende. Ama nedenini bulana kadar dinlenmeyeceğiz.", who:"Başkonsül Mirel Aksöz"}, market:{id:"mana",pct:4.4}}),
+   p=>A("ekonomi","Lothra",{title:`Rüzgâr Borsası işlemleri durdurdu; Mana Kristali rekor kırdı`, summary:`Lothra'nın alçalması nedeniyle borsada panik satışları başladı. Mana Kristali fiyatı tüm zamanların zirvesini gördü.`,
+     paras:[`Lothra Rüzgâr Borsası, şehrin alçalmasına ilişkin belirsizlik nedeniyle işlemleri öğleden sonra ${N(2,4)} saat süreyle durdurdu. Esrâvan 7 Endeksi gün içinde sert düştü.`,
+       `Levitasyon taşlarının mana ile beslenmesi nedeniyle Mana Kristali fiyatları tüm zamanların en yüksek seviyesine çıktı. Taşyürek madenlerine sipariş yağdığı bildirildi.`,
+       `Borsa yönetimi, yarın sabah işlemlerin normal saatte başlamasının planlandığını açıkladı.`],
+     quote:{q:"Bulutların üzerindeki bir borsa için alçalmak, en kötü haber.", who:EXPERTS.economy}, market:{id:"mana",pct:6.5}}),
+   p=>A("buyu","Lothra",{title:`Mühendisler nedeni buldu: Levitasyon taşlarında "büyü yorgunluğu"`, summary:`Şehri havada tutan ${N(12,40)} dev taştan birinde çatlak tespit edildi. Taşın ${N(300,900)} yıllık olduğu belirtiliyor.`,
+     paras:[`Lothralı mühendisler, şehrin alçalmasının nedenini açıkladı: Şehri havada tutan levitasyon taşlarından birinde "büyü yorgunluğu" kaynaklı bir çatlak oluştu.`,
+       `Mühendislik ekibine göre taş, ${N(300,900)} yıldır hiç değiştirilmeden kullanılıyordu. Çatlağın onarılması için Taşyürek'in uzman cüce taş ustalarından yardım istendi.`,
+       `Şehrin alçalma hızı, diğer taşlara verilen ek mana sayesinde yavaşlatıldı.`],
+     quote:{q:"Taşlar da yorulur. Bu bir uyarı; tüm taşların bakımını yapmamız gerekiyor.", who:`Lothra baş mühendisi ${person()}`}}),
+   p=>A("siyaset","Lothra",{title:`Taşyürek'ten yola çıkan ${N(30,60)} cüce mühendis Lothra'ya ulaştı`, summary:`Cüce ekip, bulut asansörü yetmeyince yolun son bölümünü grifonlarla tamamladı. Onarım çalışmaları başladı.`,
+     paras:[`Ocakbaşı Brann Kılıçdemir'in görevlendirdiği cüce mühendis ekibi, Lothra'ya ulaştı. Ekip, yolun son bölümünü Lothra'nın gönderdiği grifonlarla tamamladı.`,
+       `Cücelerin çoğunun daha önce hiç uçmadığı, bazılarının yolculuk boyunca gözlerini açmadığı aktarıldı. Ekip, gelir gelmez çatlak taşın bulunduğu şehir tabanına indi.`,
+       `Taşyürek ile Lothra arasında imzalanan protokolle, onarım masraflarının Lothra tarafından mana kristaliyle ödeneceği açıklandı.`],
+     quote:{q:"Taşı biz anlarız. Ama bir dahaki sefere yerde bir sorun olsun, yemin ederim.", who:"cüce usta Gorm Taşbilek"}}),
+   p=>A("buyu","Lothra",{title:`Lothra eski yüksekliğine döndü; şehir bulut kenarında kutlama yaptı`, summary:`Cüce ustaların onardığı taş yeniden devreye alındı. Lothra ${p.d} arşın yükselerek eski seviyesine ulaştı.`, breaking:true,
+     paras:[`Cüce ustaların ${N(3,7)} gün süren çalışmasıyla onarılan levitasyon taşı yeniden devreye alındı. Lothra, gün batımına kadar ${p.d} arşın yükselerek eski yüksekliğine döndü.`,
+       `Şehir halkı, bulut kenarındaki terasa toplanarak kutlama yaptı. Başkonsül Aksöz, cüce ustalara Lothra'nın onursal vatandaşlığını verdi.`,
+       `Rüzgâr Borsası'nda Mana Kristali fiyatları hızla geriledi.`],
+     quote:{q:"Bugün hem şehrimiz hem de dostluğumuz yeniden yükseldi.", who:"Başkonsül Mirel Aksöz"}, market:{id:"mana",pct:-7.5}})
+  ]},
+ {id:"lonca", name:"Büyücüler Loncası Seçimi", cat:"buyu", scene:"arcane", init:()=>{const a="Başbüyücü Selvane Ardıç", b=R(["Usta Ignatius Kor","Büyücü Halil Tılsımcı","Usta Vesna Karayel"]); return {a,b,w:chance(.5)?a:b,pc:N(51,63),u:N(9,22)}},
+  stages:[
+   p=>A("buyu","Ardenhal",{title:`Büyücüler Loncası seçiminde adaylar belli oldu: ${p.a} ve ${p.b}`, summary:`Loncanın ${N(300,700)} yıllık tarihindeki en çekişmeli seçimlerden birinin yaşanması bekleniyor.`,
+     paras:[`Büyücüler Loncası başkanlık seçimi için adaylar açıklandı. Görevdeki başkan ${p.a}, üçüncü dönemi için ${ins(p.b)} yarışacak.`,
+       `${p.a}, deneyimini ve Lonca'nın bütçesini dengelediği yılları öne çıkarıyor. ${p.b} ise "Yedi Kule'nin kapılarını halka açma" vaadiyle genç büyücülerin desteğini topluyor.`,
+       `Seçim, ${N(10,25)} gün sonra Yedi Kule'de yapılacak.`],
+     quote:{q:"Lonca'nın değişime ihtiyacı var. Kadim kitapları tozlu raflardan indirme zamanı geldi.", who:p.b}}),
+   p=>A("buyu","Ardenhal",{title:`Lonca münazarası karıştı: Kürsü kısa süreliğine kurbağaya dönüştü`, summary:`${p.b} ile ${p.a} arasındaki münazara, kimin yaptığı belli olmayan bir büyüyle yarıda kaldı.`,
+     paras:[`Büyücüler Loncası seçimi öncesi düzenlenen münazara, beklenmedik bir olayla yarıda kaldı. Tartışmanın en hararetli anında ${gen(p.a)} konuştuğu kürsü bir anda dev bir kurbağaya dönüştü.`,
+       `Kurbağa, salonda ${N(2,6)} kez zıpladıktan sonra yeniden kürsüye dönüştü. Her iki aday da büyüyü kendilerinin yapmadığını söyledi; Lonca soruşturma başlattı.`,
+       `Münazaranın kalan bölümü, büyü önleyici muska takılarak tamamlandı.`],
+     quote:{q:"Ben rakibime kurbağa diyecek kadar kaba değilim, onu kurbağaya çevirecek kadar hiç değilim.", who:p.b}}),
+   p=>A("buyu","Ardenhal",{title:`Lonca seçiminde son anket: Yarış başa baş, kararsızlar yüzde ${p.u}`, summary:`Kuzgun Ajansı'nın Lonca üyeleri arasında yaptığı ankette iki aday arasındaki fark ölçüm hatası sınırında kaldı.`,
+     paras:[`Kuzgun Ajansı'nın Büyücüler Loncası üyeleri arasında yaptığı son ankette, ${p.a} ile ${p.b} arasındaki fark yüzde ${N(1,3)} ile ölçüm hatası sınırında kaldı.`,
+       `Kararsız büyücülerin oranı yüzde ${p.u} olarak ölçüldü. Anketörler, bazı büyücülerin soruları "kristal küreye danışmadan" yanıtlamayı reddettiğini aktardı.`,
+       `Kâhinler ise seçim sonucunu "sisli" olarak yorumluyor.`],
+     quote:{q:"Bu yıl kehanetler bile ikiye bölünmüş durumda.", who:EXPERTS.seer}}),
+   p=>A("buyu","Ardenhal",{title:`Lonca seçimi için oy kullanılıyor: Yedi Kule önünde uzun kuyruk`, summary:`Oylar büyülü mühürle kapatılan kazanlara atılıyor. Sonuçların gece yarısı açıklanması bekleniyor.`,
+     paras:[`Büyücüler Loncası başkanlık seçimi için oy verme işlemi sabah çanlarıyla başladı. Yedi Kule önünde, ${N(400,1500)} büyücünün oluşturduğu kuyruk öğle saatlerinde ${N(2,4)} sokak öteye uzandı.`,
+       `Oylar, hile yapılmasını önlemek için büyülü mühürle kapatılan bakır kazanlara atılıyor. Kazanlara dokunan herkesin elinin geçici olarak maviye döndüğü belirtildi.`,
+       `Sonuçların gece yarısı, iki ay en yüksek noktaya ulaştığında açıklanması bekleniyor.`],
+     quote:{q:"Elim mavi oldu ama oyumu kullandım. Bu da bir şeydir.", who:vox("Ardenhal")}}),
+   p=>A("buyu","Ardenhal",{title:`${p.w} Büyücüler Loncası'nın yeni başkanı oldu`, summary:`${p.w}, oyların yüzde ${p.pc}'ini alarak seçimi kazandı. Rakibi yenilgiyi kabul etti.`, breaking:true,
+     paras:[`Büyücüler Loncası başkanlık seçiminin kazananı ${p.w} oldu. ${p.w}, oyların yüzde ${p.pc}'ini aldı. Sonuç gece yarısı Yedi Kule'nin tepesinden havai fişeklerle duyuruldu.`,
+       `${p.w===p.a?p.b:p.a}, yenilgiyi kabul ettiğini ve yeni başkana başarı dilediğini açıkladı. Kürsünün kurbağaya dönüşmesiyle ilgili soruşturma ise hâlâ sonuçlanmadı.`,
+       `Yeni başkanın göreve başlama töreni gelecek dolunayda yapılacak.`],
+     quote:{q:"Bu zafer tüm Lonca'nın. Kapılarımız, büyüye gönül veren herkese açık olacak.", who:p.w}})
+  ]},
+ {id:"su", name:"Narlıkent Barajı Anlaşmazlığı", cat:"siyaset", scene:"desert", init:()=>({n:N(2000,6000)}),
+  stages:[
+   p=>A("siyaset","Narlıkent",{title:`Kâzır'ın Narlıkent Barajı kapaklarını kapatması Karakum'u kızdırdı`, summary:`Gümüş Nehir'in suyunun kesilmesiyle Karakum'daki vahalarda su seviyesi hızla düşmeye başladı.`,
+     paras:[`Kâzır Sultanlığı, Narlıkent Barajı'nın kapaklarını "bakım" gerekçesiyle kapattı. Karar, Gümüş Nehir'e bağımlı Karakum vahalarında su seviyesinin hızla düşmesine yol açtı.`,
+       `Karakum Kağanı Tuğrul Yelesen, kararın "önceden haber verilmeden" alındığını söyleyerek Kâzır'ı sert bir dille eleştirdi.`,
+       `Kâzır ise bakım çalışmalarının ${N(10,30)} gün süreceğini açıkladı.`],
+     quote:{q:"Suyumuzu kesen, dostluğumuzu da keser.", who:"Kağan Tuğrul Yelesen"}, market:{id:"e7",pct:-0.9}}),
+   p=>A("siyaset","Kumbelen",{title:`Karakum süvarileri sınıra konuşlandı; Kâzır "tatbikat" dedi`, summary:`${fmt(p.n)} süvarinin sınıra ilerlediği bildirildi. Kâzır, birliklerinin rutin tatbikat yaptığını açıkladı.`, breaking:true,
+     paras:[`Karakum Hanlığı, ${fmt(p.n)} süvariyi Kâzır sınırına konuşlandırdı. Kağan, birliklerin "su yollarını korumak" için bölgede olduğunu söyledi.`,
+       `Kâzır Sultanlığı ise sınırın kendi tarafında "planlanmış bir tatbikat" yaptığını duyurdu. Tatbikatın ne kadar süreceği açıklanmadı.`,
+       `Esrâvan'ın diğer diyarları, tarafları itidale çağırdı.`],
+     quote:{q:"Kimse savaş istemiyor. Ama kimse susuz kalmak da istemiyor.", who:`Karakum komutanı ${person()}`}, market:{id:"eja",pct:2.1}}),
+   p=>A("siyaset","Lothra",{title:`Lothra arabulucu oldu: Taraflar bulutların üstünde masaya oturuyor`, summary:`Başkonsül Mirel Aksöz, iki tarafı tarafsız bölge sayılan Lothra'da ağırlayacak.`,
+     paras:[`Lothra Hava Cumhuriyeti, Kâzır ile Karakum arasındaki su anlaşmazlığında arabuluculuk yapmayı kabul etti. Görüşmeler, tarafsız bölge sayılan Lothra'da yapılacak.`,
+       `Başkonsül Mirel Aksöz, "Bulutların üzerinden bakınca sınırlar görünmez" diyerek tarafları uzlaşmaya davet etti.`,
+       `Her iki heyetin de yarın sabah bulut asansörüyle Lothra'ya çıkması bekleniyor.`],
+     quote:{q:"Bulutların üzerinden bakınca sınırlar görünmez.", who:"Başkonsül Mirel Aksöz"}}),
+   p=>A("siyaset","Lothra",{title:`Müzakerelerde "rüzgâr karşılığı su" formülü konuşuluyor`, summary:`Kulis bilgilerine göre Karakum, Kâzır'ın yel değirmenleri için çöl rüzgârını yönlendirmeyi teklif etti.`,
+     paras:[`Lothra'daki su müzakerelerinin ikinci gününde masaya ilginç bir teklif geldi. Kulis bilgilerine göre Karakum, Kâzır'ın yel değirmenleri için çöl rüzgârlarını yönlendirmeyi teklif etti.`,
+       `Karakum rüzgâr şamanlarının yüzyıllardır çöl rüzgârını yönlendirebildiği biliniyor. Karşılığında Kâzır'ın barajdan her mevsim belirli bir miktar su bırakması isteniyor.`,
+       `Taraflar, görüşmelerin "olumlu bir havada" geçtiğini açıkladı.`],
+     quote:{q:"Rüzgârı satıp suyu almak, çölde yaşamanın en eski bilgeliğidir.", who:EXPERTS.history}}),
+   p=>A("siyaset","Lothra",{title:`Tarihî anlaşma imzalandı: Karakum'un rüzgârına karşılık Kâzır'ın suyu`, summary:`Sultan Demirhan ile Kağan Tuğrul Yelesen, Lothra'da "Bulut Antlaşması"nı imzaladı. Süvariler sınırdan çekiliyor.`, breaking:true,
+     paras:[`Kâzır Sultanı Demirhan ile Karakum Kağanı Tuğrul Yelesen, Lothra'da "Bulut Antlaşması"nı imzaladı. Antlaşmaya göre Kâzır, Narlıkent Barajı'ndan her mevsim belirli miktarda su bırakacak; Karakum ise çöl rüzgârlarını Kâzır'ın değirmenlerine yönlendirecek.`,
+       `Karakum süvarilerinin sınırdan çekilmeye başladığı bildirildi. Lothra Rüzgâr Borsası'nda Esrâvan 7 Endeksi yükselişle karşılık verdi.`,
+       `İmza töreninin ardından iki lider, bulut terasında birlikte çay içti.`],
+     quote:{q:"Bugün su ve rüzgâr kardeş oldu.", who:"Sultan Demirhan"}, market:{id:"e7",pct:2}})
+  ]},
+ {id:"batik", name:"Sisli Adalar'daki Batık Şehir", cat:"kultur", scene:"sea", init:()=>({k:N(30,60)}),
+  stages:[
+   p=>A("doga","Fenerburun",{title:`Fenerburun balıkçıları sisin içinden çan sesleri duyduğunu bildirdi`, summary:`Balıkçılar, sesin denizin altından geldiğini ve gece boyunca düzenli aralıklarla tekrarlandığını anlattı.`,
+     paras:[`Fenerburun açıklarında avlanan balıkçılar, yoğun sisin içinden çan sesleri duyduklarını bildirdi. Sesin denizin altından geldiği ve gece boyunca düzenli aralıklarla tekrarlandığı belirtildi.`,
+       `Bölgede herhangi bir gemi ya da fener çanı bulunmadığı doğrulandı. Liman Lordu Corvin Hale, kıyıya bir dalgıç ekibi gönderileceğini açıkladı.`,
+       `Adalılar arasında, efsanelerde anlatılan batık bir şehrin "uyandığı" söylentisi hızla yayıldı.`],
+     quote:{q:"Kırk yıldır bu sularda balık tutarım. Böyle bir ses hiç duymadım. Tüylerim diken diken oldu.", who:vox("Fenerburun")}}),
+   p=>A("kultur","Fenerburun",{title:`Dalgıçlar ${p.k} kulaç derinlikte bir kule tepesine ulaştı`, summary:`Su altında bulunan kulenin tepesinde dev bir bronz çan asılı. Uzmanlar, yapının en az ${N(800,2000)} yıllık olduğunu düşünüyor.`, breaking:true,
+     paras:[`Sisli Adalar'ın dalgıç ekibi, Fenerburun açıklarında ${p.k} kulaç derinlikte bir taş kulenin tepesine ulaştı. Kulenin tepesinde, akıntıyla sallanan dev bir bronz çan bulundu.`,
+       `Dalgıçlar, kulenin aşağısında başka yapıların da seçilebildiğini, ancak sisin ve karanlığın daha derine inmeyi zorlaştırdığını anlattı. Yapının en az ${N(800,2000)} yıllık olduğu tahmin ediliyor.`,
+       `Yedi Kule'den tarihçiler, bölgeye gitmek için yola çıktı.`],
+     quote:{q:"Bu, Esrâvan tarihinin en büyük keşiflerinden biri olabilir.", who:EXPERTS.history}}),
+   p=>A("doga","Fenerburun",{title:`Bölgede yaşayan kraken, kazı çalışmalarına itiraz etti`, summary:`Kraken, mürekkeple yazılmış bir dilekçeyi dalgıçların teknesine bıraktı. Dilekçede "yüzyıllardır burada yaşıyorum" ifadesi yer alıyor.`,
+     paras:[`Batık kulenin bulunduğu bölgede yaşayan yaşlı bir kraken, kazı çalışmalarına itiraz etti. Kraken, kendi mürekkebiyle yazdığı bir dilekçeyi gece boyunca dalgıçların teknesine bıraktı.`,
+       `Kadim Deniz Dili'nde yazılan dilekçede, krakenin "yüzyıllardır bu harabelerde huzur içinde yaşadığı" ve "gürültüden rahatsız olduğu" belirtiliyor.`,
+       `Liman Lordu, krakenle görüşmek için bir deniz kızı tercüman görevlendirdi.`],
+     quote:{q:"Krakenin itirazı haklı. Onun evine misafir olan biziz.", who:EXPERTS.law}, market:{id:"e7",pct:-0.3}}),
+   p=>A("kultur","Mavikum",{title:`Kitabe çözüldü: Batık şehrin adı Ulmaris`, summary:`Kulenin kapısındaki kitabe, kayıp sanılan efsanevi liman şehri Ulmaris'e ait olduğunu ortaya koydu.`, breaking:true,
+     paras:[`Batık kulenin kapısında bulunan kitabe çözüldü. Kitabede yazanlara göre kule, efsanelerde anlatılan ve ${N(1000,2500)} yıl önce bir gecede sulara gömüldüğü söylenen liman şehri Ulmaris'e ait.`,
+       `Yedi Kule tarihçileri, kitabenin "Denizin sesi çan ile, şehrin sesi insan ile" dizesiyle başladığını aktardı. Çan seslerinin, akıntıların değişmesiyle yeniden duyulmaya başladığı düşünülüyor.`,
+       `Kraken ile yapılan görüşmelerin ise olumlu ilerlediği bildirildi.`],
+     quote:{q:"Ulmaris'in bir masal olmadığını artık biliyoruz. Tarih kitapları yeniden yazılacak.", who:EXPERTS.history}}),
+   p=>A("kultur","Fenerburun",{title:`Ulmaris'e ilk turlar başlıyor; rehberlik krakene emanet`, summary:`Krakenle yapılan anlaşmaya göre ziyaretçiler, kabarcık büyüsüyle şehrin harabelerini gezebilecek. Rehberliği kraken yapacak.`,
+     paras:[`Sisli Adalar yönetimi, batık şehir Ulmaris'e ilk turların gelecek ay başlayacağını açıkladı. Ziyaretçiler, kabarcık büyüsü sayesinde harabeleri nefes alarak gezebilecek.`,
+       `Bölgede yaşayan kraken ile yapılan anlaşmaya göre turlar haftada yalnızca ${N(2,3)} gün yapılacak ve rehberliği kraken üstlenecek. Kraken ayrıca bilet gelirlerinden pay alacak.`,
+       `İlk tur biletlerinin satışa çıktıktan sonra ${N(2,9)} dakika içinde tükendiği bildirildi.`],
+     quote:{q:"Kraken çok titiz bir rehber. Çana dokunanı kibarca yüzeye fırlatıyor.", who:`tur organizatörü ${person()}`}, market:{id:"e7",pct:0.6}})
+  ]}
+];
+let arcs = [];      // aktif: {id, stage, p, items:[ids], last}
+let arcQueue = shuffle(ARCS.map(a=>a.id));
+
+/* ============ Durum ============ */
+let items = [];
+let seq = 1;
+let tab = "all";
+let speed = 20;
+let running = true;
+let pending = [];
+let readIds = new Set();
+const freshIds = new Set();
+
+function build(raw, t, arcInfo){
+  const cat = raw.cat;
+  const paras = raw.paras.slice();
+  const body = [paras[0], paras[1]];
+  const q = raw.quote; const q2 = raw.quote2;
+  for (let i=2;i<paras.length;i++) body.push(paras[i]);
+  body.push(R(CLOSING[cat]));
+  return {
+    id: "h" + (seq++), t, cat, place: raw.place, title: raw.title, summary: raw.summary, body,
+    quote: q || null, quote2: q2 || null, breaking: !!raw.breaking, arc: arcInfo || null,
+    scene: raw.scene || (arcInfo ? ARCS.find(a=>a.id===arcInfo.id).scene : CATS[cat].scene),
+    seed: Math.floor(Math.random()*1e9), author: R(REPORTERS),
+    views: N(40,300) * (raw.breaking ? 4 : 1), market: raw.market || null
+  };
+}
+
+const CATW = {siyaset:3, ekonomi:2.4, buyu:2.2, spor:2.6, kultur:2.3, doga:2, asayis:1.8};
+function pickCat(){const s=Object.values(CATW).reduce((a,b)=>a+b,0);let r=Math.random()*s;for(const k in CATW){if((r-=CATW[k])<0)return k}return "siyaset"}
+
+function marketNews(){
+  let best=null, bp=0;
+  for (const m of markets){ const pc=(m.p-m.ref)/m.ref*100; if (Math.abs(pc)>Math.abs(bp)){bp=pc;best=m} }
+  if (!best || Math.abs(bp) < 2) return null;
+  const upMove = bp>0; const pc = fmt(Math.abs(bp),1);
+  const why = upMove ? R(["güvenli liman arayışındaki yatırımcıların alımları","kuzey diyarlarından gelen güçlü talep","kâhinlerin olumlu yıl sonu kehanetleri","Kâzır sarayının yüklü alım emirleri"]) : R(["kâr realizasyonu","Taşyürek'ten gelen arz fazlası","Lothra'daki fon çıkışları","beklenenden zayıf hasat verileri"]);
+  best.ref = best.p;
+  return A("ekonomi","Lothra",{title:`${best.name} yüzde ${pc} ${upMove?"değer kazandı":"değer kaybetti"}`, summary:`${best.name} (${best.code}) ${fmt(best.p,best.d)} gümüş sikkeden işlem görüyor. Hareketin arkasında ${why} var.`,
+    paras:[`Lothra Rüzgâr Borsası'nda ${best.name} son ölçümden bu yana yüzde ${pc} ${upMove?"yükseldi":"geriledi"} ve ${fmt(best.p,best.d)} gümüş sikke seviyesine ${upMove?"çıktı":"indi"}.`,
+      `Piyasa uzmanları hareketi büyük ölçüde ${why} ile açıklıyor. Borsa salonunda ${upMove?"alım":"satış"} emirlerinin öğleden sonra yoğunlaştığı gözlendi.`,
+      `${upMove?"Yükselişin":"Düşüşün"} kalıcı olup olmayacağı, hafta sonu açıklanacak Esrâvan Ticaret Birliği verilerine bağlı.`],
+    quote:{q: upMove ? "Bu seviyelerde temkinli olmak gerekiyor. Rüzgâr hızlı döner." : "Panik satışına gerek yok, temeller hâlâ sağlam.", who:EXPERTS.economy}});
+}
+
+function nextRaw(){
+  // gelişen hikâye
+  if (arcs.length < 2 && chance(.5) && arcQueue.length){ const id = arcQueue.shift(); const d = ARCS.find(a=>a.id===id); arcs.push({id, run:id+"-"+Date.now()+"-"+N(0,1e6), stage:0, p:d.init(), items:[], last:0}); }
+  if (arcs.length && chance(.34)){
+    const a = R(arcs); const d = ARCS.find(x=>x.id===a.id);
+    const raw = d.stages[a.stage](a.p);
+    const info = {id:a.id, run:a.run, name:d.name, stage:a.stage+1, total:d.stages.length};
+    a.stage++;
+    return {raw, info, arc:a};
+  }
+  if (chance(.15)){ const m = marketNews(); if (m) return {raw:m}; }
+  const recent = new Set(items.slice(0,30).map(i=>i.title));
+  for (let k=0;k<6;k++){
+    const raw = R(T[pickCat()])();
+    if (!recent.has(raw.title)) return {raw};
+  }
+  return {raw:R(T[pickCat()])()};
+}
+
+function produce(t){
+  const {raw, info, arc} = nextRaw();
+  const it = build(raw, t, info);
+  if (arc){
+    arc.items.push(it.id); arc.last = t;
+    const d = ARCS.find(x=>x.id===arc.id);
+    if (arc.stage >= d.stages.length){ arcs = arcs.filter(x=>x!==arc); arcQueue.push(arc.id); }
+  }
+  if (it.market) shock(it.market.id, it.market.pct);
+  return it;
+}
+
+/* ============ Görseller (üretken illüstrasyon) ============ */
+const PAL = {
+  castle:{sky:["#2b3a67","#e9a46a"], far:"#3d4a73", mid:"#2a2f4f", near:"#16182b", glow:"#ffd28a", moon:"#ffe9c2"},
+  market:{sky:["#f4c27a","#e46b4f"], far:"#c2614d", mid:"#7c3b3b", near:"#3b1f2b", glow:"#ffe08a", moon:"#fff1c9"},
+  arcane:{sky:["#0f1033","#3a1f6e"], far:"#2a1b55", mid:"#1b1240", near:"#0c0a22", glow:"#8ff0ff", moon:"#d6c8ff", night:true},
+  arena:{sky:["#7ec8e3","#f3e5ab"], far:"#6aa37b", mid:"#3f6e57", near:"#24443a", glow:"#fff5c0", moon:"#fffbe6"},
+  festival:{sky:["#1c1440","#7a2f63"], far:"#3a2257", mid:"#24163d", near:"#120c22", glow:"#ffb347", moon:"#ffe2b8", night:true},
+  sky:{sky:["#8fb8de","#e8d7c5"], far:"#8197b2", mid:"#55708f", near:"#2f4560", glow:"#ffffff", moon:"#fffaf0"},
+  night:{sky:["#0b0f1e","#27304d"], far:"#1d2540", mid:"#141a30", near:"#090c18", glow:"#ffcf6b", moon:"#e9ecff", night:true},
+  dragon:{sky:["#3b1d2e","#e5683c"], far:"#7a3a3a", mid:"#4a2228", near:"#200f16", glow:"#ffb35c", moon:"#ffd9a8"},
+  floating:{sky:["#a8d8f0","#f6e7d2"], far:"#c9dbe8", mid:"#7b8fa3", near:"#4d5d70", glow:"#ffffff", moon:"#fffdf5"},
+  desert:{sky:["#f0b86e","#f7e3b5"], far:"#d9a066", mid:"#c4844c", near:"#8f5a32", glow:"#fff3c4", moon:"#fff8e1"},
+  sea:{sky:["#4d6b80","#c9d6dc"], far:"#5d7a8a", mid:"#2f5266", near:"#173246", glow:"#e8f4ff", moon:"#f5fbff"}
+};
+function ridge(r, y, amp, col, steps=9){
+  let pts = `0,225 0,${y}`;
+  for (let i=1;i<=steps;i++){ const x = i*400/steps; pts += ` ${x.toFixed(0)},${(y - r()*amp + amp/3).toFixed(0)}`; }
+  return `<polygon points="${pts} 400,225" fill="${col}"/>`;
+}
+function castle(r, x, base, col, glow){
+  let s = ""; const w = 90 + r()*60;
+  s += `<rect x="${x}" y="${base-40}" width="${w}" height="60" fill="${col}"/>`;
+  for (let i=0;i<w;i+=10) s += `<rect x="${x+i}" y="${base-46}" width="6" height="7" fill="${col}"/>`;
+  const towers = 2 + Math.floor(r()*3);
+  for (let i=0;i<towers;i++){
+    const tx = x + (i/(towers-1))*(w-18); const th = 55 + r()*45;
+    s += `<rect x="${tx}" y="${base-th}" width="18" height="${th+20}" fill="${col}"/>`;
+    s += `<polygon points="${tx-3},${base-th} ${tx+9},${base-th-22-r()*12} ${tx+21},${base-th}" fill="${col}"/>`;
+    s += `<rect x="${tx+7}" y="${base-th+12}" width="4" height="6" fill="${glow}" opacity=".9"/>`;
+  }
+  for (let i=0;i<5;i++) s += `<rect x="${x+12+r()*(w-24)}" y="${base-28+r()*14}" width="3" height="5" fill="${glow}" opacity=".85"/>`;
+  return s;
+}
+function dragonSil(x, y, sc, col, flip){
+  return `<g transform="translate(${x} ${y}) scale(${flip?-sc:sc} ${sc})" fill="${col}"><path d="M10 40 Q30 30 50 34 Q65 36 75 30 L88 26 L84 32 L92 33 L80 37 Q68 44 52 44 Q34 46 20 44 Q12 46 2 54 Q8 44 10 40Z"/><path d="M38 35 L22 4 L42 18 L50 0 L56 20 L68 8 L62 35Z"/></g>`;
+}
+const bird = (x,y,s,col) => `<path d="M${x} ${y} q${3*s} ${-3*s} ${6*s} 0 q${3*s} ${-3*s} ${6*s} 0" fill="none" stroke="${col}" stroke-width="${Math.max(1,s*.6)}" stroke-linecap="round"/>`;
+function waves(r, y, col, amp){
+  let d = `M0 ${y}`; for (let x=0;x<=400;x+=20) d += ` Q${x+10} ${y-amp*(r()+.4)} ${x+20} ${y}`;
+  return `<path d="${d} L400 225 L0 225Z" fill="${col}"/>`;
+}
+function scene(seed, kind){
+  const r = rng(seed); const P = PAL[kind] || PAL.sky; const id = "g" + seed;
+  let s = `<svg viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>`+
+    `<linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.sky[0]}"/><stop offset="1" stop-color="${P.sky[1]}"/></linearGradient>`+
+    `<radialGradient id="${id}r"><stop offset="0" stop-color="${P.glow}" stop-opacity=".85"/><stop offset="1" stop-color="${P.glow}" stop-opacity="0"/></radialGradient></defs>`+
+    `<rect width="400" height="225" fill="url(#${id}s)"/>`;
+  if (P.night) for (let i=0;i<50;i++) s += `<circle cx="${(r()*400).toFixed(0)}" cy="${(r()*130).toFixed(0)}" r="${(r()*1.1+.2).toFixed(1)}" fill="#fff" opacity="${(r()*.7+.2).toFixed(2)}"/>`;
+  const mx = 40 + r()*320, my = 30 + r()*50, mr = 12 + r()*16;
+  s += `<circle cx="${mx}" cy="${my}" r="${mr*3}" fill="url(#${id}r)"/><circle cx="${mx}" cy="${my}" r="${mr}" fill="${P.moon}"/>`;
+  if (r() < .5) s += `<circle cx="${(mx+60+r()*80)%400}" cy="${my+10}" r="${mr*.45}" fill="${P.moon}" opacity=".7"/>`;
+  switch(kind){
+    case "castle": s += ridge(r,150,40,P.far) + castle(r, 60+r()*180, 175, P.mid, P.glow) + ridge(r,195,20,P.near,6); break;
+    case "market": {
+      s += ridge(r,140,30,P.far);
+      const cols = ["#e9c46a","#e76f51","#2a9d8f","#f4a261","#8ab17d"];
+      for (let i=0;i<6;i++){ const x = i*68 + r()*12 - 10, w = 56, y = 150 + r()*12; const c = cols[Math.floor(r()*cols.length)];
+        s += `<rect x="${x+6}" y="${y}" width="${w-12}" height="${225-y}" fill="${P.mid}"/><polygon points="${x},${y} ${x+w/2},${y-26} ${x+w},${y}" fill="${c}"/><polygon points="${x+w/2-6},${y-23} ${x+w/2},${y-26} ${x+w/2+6},${y-23} ${x+w/2+3},${y} ${x+w/2-3},${y}" fill="#fff" opacity=".35"/>`; }
+      for (let i=0;i<9;i++) s += `<circle cx="${r()*400}" cy="${205+r()*16}" r="${4+r()*3}" fill="#f2c14e" stroke="#a87b1e" stroke-width="1"/>`;
+      s += `<rect y="214" width="400" height="11" fill="${P.near}"/>`; break; }
+    case "arcane": {
+      s += ridge(r,175,24,P.far) ;
+      const cx = 120 + r()*160, cy = 120;
+      s += `<circle cx="${cx}" cy="${cy}" r="90" fill="url(#${id}r)" opacity=".7"/>`;
+      for (let k=0;k<3;k++) s += `<circle cx="${cx}" cy="${cy}" r="${30+k*20}" fill="none" stroke="${P.glow}" stroke-width="${k===1?2:1}" stroke-dasharray="${k===2?"3 6":k===0?"":"12 4"}" opacity="${.9-k*.2}"/>`;
+      const pts = Array.from({length:7},(_,i)=>{const a=-Math.PI/2+i*4*Math.PI/7;return `${(cx+28*Math.cos(a)).toFixed(1)},${(cy+28*Math.sin(a)).toFixed(1)}`}).join(" ");
+      s += `<polygon points="${pts}" fill="none" stroke="${P.glow}" stroke-width="1.5"/>`;
+      for (let i=0;i<16;i++){ const a = r()*Math.PI*2; s += `<line x1="${cx+52*Math.cos(a)}" y1="${cy+52*Math.sin(a)}" x2="${cx+58*Math.cos(a)}" y2="${cy+58*Math.sin(a)}" stroke="${P.glow}" stroke-width="2"/>`; }
+      s += ridge(r,205,12,P.near,5); break; }
+    case "arena": {
+      s += ridge(r,140,20,P.far);
+      s += `<ellipse cx="200" cy="225" rx="260" ry="80" fill="${P.mid}"/><ellipse cx="200" cy="232" rx="220" ry="58" fill="${P.near}"/>`;
+      for (let i=0;i<4;i++) s += `<rect x="${60+i*90}" y="${130+r()*20}" width="4" height="60" fill="${P.near}"/><circle cx="${62+i*90}" cy="${125+r()*20}" r="14" fill="none" stroke="#f2c14e" stroke-width="3"/>`;
+      for (let i=0;i<3;i++) s += dragonSil(40+r()*300, 40+r()*60, .32+r()*.12, "#2c3340", r()<.5);
+      break; }
+    case "festival": {
+      s += ridge(r,165,30,P.far) + ridge(r,195,18,P.mid,7);
+      for (let l=0;l<3;l++){ const y0 = 60+l*35+r()*10; const sag = 20+r()*16;
+        s += `<path d="M-10 ${y0} Q200 ${y0+sag*2} 410 ${y0}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="1"/>`;
+        for (let i=0;i<9;i++){ const tt=(i+.5)/9; const x=-10+420*tt; const y=(1-tt)*(1-tt)*y0+2*(1-tt)*tt*(y0+sag*2)+tt*tt*y0;
+          const c = ["#ffb347","#ff6f61","#ffd166","#f78fb3"][Math.floor(r()*4)];
+          s += `<circle cx="${x}" cy="${y+8}" r="12" fill="url(#${id}r)"/><rect x="${x-4}" y="${y+2}" width="8" height="11" rx="3" fill="${c}"/>`; } }
+      s += `<rect y="210" width="400" height="15" fill="${P.near}"/>`; break; }
+    case "night": {
+      s += ridge(r,160,30,P.far);
+      let x = 0; while (x < 400){ const w = 26+r()*34, h = 40+r()*80; s += `<rect x="${x}" y="${225-h}" width="${w}" height="${h}" fill="${P.mid}"/>`;
+        for (let i=0;i<4;i++) if (r()<.55) s += `<rect x="${x+4+r()*(w-10)}" y="${225-h+6+r()*(h-20)}" width="4" height="5" fill="${P.glow}" opacity=".9"/>`; x += w + 2; }
+      const lx = 80 + r()*240; s += `<circle cx="${lx}" cy="170" r="40" fill="url(#${id}r)"/><rect x="${lx-1.5}" y="170" width="3" height="55" fill="${P.near}"/><rect x="${lx-5}" y="162" width="10" height="10" fill="${P.glow}"/>`;
+      break; }
+    case "dragon": {
+      s += ridge(r,140,40,P.far) + ridge(r,180,30,P.mid,7);
+      s += dragonSil(120+r()*120, 40+r()*30, 1.2+r()*.4, P.near, r()<.5);
+      for (let i=0;i<4;i++) s += dragonSil(r()*380, 20+r()*70, .3+r()*.25, P.mid, r()<.5);
+      s += ridge(r,210,12,P.near,6); break; }
+    case "floating": {
+      for (let i=0;i<5;i++) s += `<ellipse cx="${r()*400}" cy="${150+r()*60}" rx="${50+r()*60}" ry="${12+r()*10}" fill="#fff" opacity=".75"/>`;
+      const ix = 120 + r()*100, iy = 110;
+      s += `<polygon points="${ix},${iy} ${ix+160},${iy} ${ix+110},${iy+40} ${ix+80},${iy+80} ${ix+50},${iy+38}" fill="${P.near}"/>`;
+      for (let i=0;i<8;i++){ const bx = ix+8+i*18, bh = 14+r()*32; s += `<rect x="${bx}" y="${iy-bh}" width="13" height="${bh}" fill="${P.mid}"/><polygon points="${bx-2},${iy-bh} ${bx+6.5},${iy-bh-10} ${bx+15},${iy-bh}" fill="${P.mid}"/>`; }
+      s += `<rect x="${ix+70}" y="${iy-70}" width="12" height="70" fill="${P.mid}"/>`;
+      for (let i=0;i<4;i++) s += `<ellipse cx="${r()*400}" cy="${190+r()*30}" rx="${70+r()*60}" ry="${14+r()*8}" fill="#fff" opacity=".9"/>`;
+      s += bird(40+r()*60, 60, 2, P.near) + bird(300+r()*60, 50, 1.5, P.near); break; }
+    case "desert": {
+      s += `<path d="M0 160 Q100 130 200 160 T400 150 L400 225 L0 225Z" fill="${P.far}"/><path d="M0 185 Q120 160 240 190 T400 180 L400 225 L0 225Z" fill="${P.mid}"/><path d="M0 210 Q140 195 260 212 T400 205 L400 225 L0 225Z" fill="${P.near}"/>`;
+      for (let i=0;i<6;i++){ const x = 30 + i*60 + r()*20; s += `<g fill="${P.near}" transform="translate(${x} ${178+r()*6}) scale(.5)"><ellipse cx="0" cy="0" rx="16" ry="9"/><rect x="10" y="-22" width="5" height="20"/><rect x="-12" y="4" width="3" height="14"/><rect x="8" y="4" width="3" height="14"/><ellipse cx="2" cy="-10" rx="6" ry="7"/></g>`; }
+      break; }
+    case "sea": {
+      s += `<rect y="0" width="400" height="225" fill="#fff" opacity=".18"/>`;
+      s += `<rect x="${250+r()*80}" y="95" width="10" height="30" fill="${P.near}" opacity=".6"/>`;
+      s += waves(r,130,P.far,6) + waves(r,155,P.mid,8);
+      const bx = 60 + r()*120; s += `<path d="M${bx} 150 l40 0 l-6 9 l-28 0z" fill="${P.near}"/><rect x="${bx+18}" y="118" width="2" height="32" fill="${P.near}"/><polygon points="${bx+21},120 ${bx+38},146 ${bx+21},146" fill="#e9eef2"/>`;
+      s += waves(r,185,P.near,10);
+      for (let i=0;i<3;i++) s += `<path d="M${r()*400} ${200+r()*16} q12 -14 24 0" fill="none" stroke="${P.far}" stroke-width="3" stroke-linecap="round"/>`;
+      s += `<rect width="400" height="225" fill="#e6eef2" opacity=".18"/>`; break; }
+    default: {
+      s += ridge(r,140,50,P.far) + ridge(r,170,40,P.mid,8) + ridge(r,200,20,P.near,6);
+      for (let i=0;i<5;i++) s += bird(r()*360, 40+r()*60, 1+r()*1.2, P.near);
+      for (let i=0;i<3;i++) s += `<ellipse cx="${r()*400}" cy="${50+r()*50}" rx="${40+r()*40}" ry="${8+r()*6}" fill="#fff" opacity=".55"/>`;
+    }
+  }
+  return s + `</svg>`;
+}
+const capFor = it => `${up(it.place)} · Kuzgun/${it.author.split(" ")[1] || it.author}`;
+
+/* ============ Çizim ============ */
+const TABS = [["all","Tümü"],["brk","Son dakika"],["dev","Gelişen hikâyeler"],...Object.entries(CATS).map(([k,v])=>[k,v.label])];
+function renderTabs(){
+  const cnt = k => k==="all"?items.length : k==="brk"?items.filter(i=>i.breaking).length : k==="dev"?items.filter(i=>i.arc).length : items.filter(i=>i.cat===k).length;
+  $("#tabs").innerHTML = TABS.map(([k,l]) => `<button role="tab" data-tab="${k}" aria-selected="${tab===k}">${l}<span class="ct num">${cnt(k)}</span></button>`).join("");
+}
+function chips(it){
+  let s = "";
+  if (it.breaking) s += `<span class="chip brk">Son dakika</span>`;
+  if (it.arc) s += `<span class="chip dev">Gelişen · ${it.arc.stage}/${it.arc.total}</span>`;
+  return s;
+}
+function metaLine(it){
+  return `<div class="meta">${chips(it)}<span class="cat">${CATS[it.cat].label}</span><span>${esc(it.place)}</span><time class="ago" data-t="${it.t}">${ago(it.t)}</time></div>`;
+}
+function filtered(){
+  if (tab==="all") return items;
+  if (tab==="brk") return items.filter(i=>i.breaking);
+  if (tab==="dev") return items.filter(i=>i.arc);
+  return items.filter(i=>i.cat===tab);
+}
+function renderFeed(){
+  const list = filtered();
+  const fr = id => freshIds.has(id) ? " fresh" : "";
+  const rd = id => readIds.has(id) ? " read" : "";
+  if (!list.length){ $("#topArea").innerHTML = `<p class="empty">Bu başlıkta henüz haber yok. Kuzgunlar yolda.</p>`; $("#listArea").innerHTML = ""; return; }
+  const [lead, ...rest] = list; const mids = rest.slice(0,2), others = rest.slice(2);
+  $("#topArea").innerHTML =
+    `<article class="story lead${fr(lead.id)}" data-id="${lead.id}" tabindex="0"><div class="img">${scene(lead.seed,lead.scene)}<span class="cap">${esc(capFor(lead))}</span></div>${metaLine(lead)}<h2>${esc(lead.title)}</h2><p>${esc(lead.summary)}</p></article>` +
+    (mids.length ? `<div class="mids">${mids.map(it => `<article class="story mid${fr(it.id)}${rd(it.id)}" data-id="${it.id}" tabindex="0"><div class="img">${scene(it.seed,it.scene)}</div>${metaLine(it)}<h3>${esc(it.title)}</h3></article>`).join("")}</div>` : "");
+  $("#listArea").innerHTML = others.length ? `<div class="listhead">Akış <span>${others.length} haber daha</span></div>` +
+    others.map(it => `<article class="story row${fr(it.id)}${rd(it.id)}" data-id="${it.id}" tabindex="0"><div>${metaLine(it)}<h3>${esc(it.title)}</h3><p>${esc(it.summary)}</p></div><div class="img">${scene(it.seed,it.scene)}</div></article>`).join("") : "";
+  freshIds.clear();
+}
+function renderTicker(){
+  const hs = items.filter(i=>i.breaking).slice(0,6);
+  const pool = (hs.length >= 4 ? hs : hs.concat(items.filter(i=>!i.breaking).slice(0,6-hs.length)));
+  const html = pool.map(i => `<span data-id="${i.id}">${hm(i.t)} · ${esc(i.title)}</span>`).join("");
+  $("#track").innerHTML = html + html;
+}
+function spark(h, d){
+  const mn = Math.min(...h), mx = Math.max(...h), rg = (mx-mn) || 1;
+  const pts = h.map((v,i)=>`${(i/(h.length-1)*62+1).toFixed(1)},${(22-(v-mn)/rg*20).toFixed(1)}`).join(" ");
+  const last = pts.split(" ").pop().split(",");
+  const col = d >= 0 ? "var(--up)" : "var(--down)";
+  return `<svg viewBox="0 0 64 24" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="2" fill="${col}"/></svg>`;
+}
+function renderMarkets(){
+  $("#markets").innerHTML = markets.map(m => { const d = (m.p-m.open)/m.open*100; const c = d>=0?"up":"down";
+    return `<div class="mk"><div class="nm">${m.name}<small>${m.code}</small></div>${spark(m.hist,d)}<div class="px num">${fmt(m.p,m.d)}<small class="${c}">${d>=0?"+":"−"}%${fmt(Math.abs(d),2)}</small></div></div>`; }).join("");
+}
+function renderLeague(){
+  const s = league.slice().sort((a,b)=>b.p-a.p || (b.a-b.y)-(a.a-a.y) || b.a-a.a);
+  $("#lgweek").textContent = `${week}. hafta`;
+  $("#league").innerHTML = `<table class="lg"><thead><tr><th></th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>Av</th><th>P</th></tr></thead><tbody>` +
+    s.map((x,i)=>`<tr><td>${i+1}</td><td>${x.t}</td><td>${x.o}</td><td>${x.g}</td><td>${x.b}</td><td>${x.m}</td><td>${x.a-x.y>0?"+":""}${x.a-x.y}</td><td>${x.p}</td></tr>`).join("") + `</tbody></table>`;
+}
+const ICONS = {
+  sun:`<circle cx="12" cy="12" r="4.5" fill="currentColor"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></g>`,
+  cloud:`<path d="M7 18h10a4 4 0 0 0 .4-8A5.5 5.5 0 0 0 6.8 9.5 4.3 4.3 0 0 0 7 18z" fill="currentColor"/>`,
+  rain:`<path d="M7 14h10a4 4 0 0 0 .4-8A5.5 5.5 0 0 0 6.8 5.5 4.3 4.3 0 0 0 7 14z" fill="currentColor"/><path d="M8 17l-1 3M12 17l-1 3M16 17l-1 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`,
+  storm:`<path d="M7 13h10a4 4 0 0 0 .4-8A5.5 5.5 0 0 0 6.8 4.5 4.3 4.3 0 0 0 7 13z" fill="currentColor"/><path d="M12.5 14l-3 5h3l-1.5 4 4.5-6h-3l1.5-3z" fill="currentColor"/>`,
+  snow:`<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/></g>`,
+  mana:`<path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/>`,
+  ash:`<path d="M7 12h10a4 4 0 0 0 .4-8A5.5 5.5 0 0 0 6.8 3.5 4.3 4.3 0 0 0 7 12z" fill="currentColor" opacity=".6"/><circle cx="8" cy="17" r="1.4" fill="currentColor"/><circle cx="13" cy="19" r="1.4" fill="currentColor"/><circle cx="16" cy="15.5" r="1.4" fill="currentColor"/>`,
+  frog:`<ellipse cx="12" cy="14" rx="8" ry="5.5" fill="currentColor"/><circle cx="8" cy="8.5" r="2.8" fill="currentColor"/><circle cx="16" cy="8.5" r="2.8" fill="currentColor"/>`,
+  fog:`<path d="M3 8h18M5 12h14M3 16h18M7 20h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`
+};
+function renderWeather(){
+  $("#weather").innerHTML = weather.map(w => `<div class="wx"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[w.k]}</svg><div>${w.c}<small>${w.t}</small></div><b class="num">${w.temp}°</b></div>`).join("");
+}
+function moonSVG(p){
+  const r = 11, c = Math.cos(2*Math.PI*p), rx = Math.abs(r*c).toFixed(2);
+  let d;
+  if (p < .5) d = `M0 ${-r} A${r} ${r} 0 0 1 0 ${r} A${rx} ${r} 0 0 ${c>0?0:1} 0 ${-r}Z`;
+  else d = `M0 ${-r} A${r} ${r} 0 0 0 0 ${r} A${rx} ${r} 0 0 ${c>0?1:0} 0 ${-r}Z`;
+  return `<svg width="30" height="30" viewBox="-15 -15 30 30" aria-hidden="true"><circle r="${r}" fill="var(--sunk)" stroke="var(--line)"/><path d="${d}" fill="var(--gold)"/></svg>`;
+}
+function phaseName(p){ return p<.03||p>.97?"Yeni ay":p<.22?"Hilal (büyüyen)":p<.28?"İlk dördün":p<.47?"Şişkin (büyüyen)":p<.53?"Dolunay":p<.72?"Şişkin (küçülen)":p<.78?"Son dördün":"Hilal (küçülen)"; }
+function renderMoons(){
+  const day = Date.now()/86400000;
+  const ms = [["Selis",((day-3)/29.53)%1],["Morun",((day-1)/11.2)%1]];
+  $("#moons").innerHTML = ms.map(([n,p]) => `<div class="moon">${moonSVG(p)}<div>${n}<small>${phaseName(p)} · %${Math.round((1-Math.cos(2*Math.PI*p))/2*100)}</small></div></div>`).join("");
+}
+function renderPopular(){
+  const top = items.slice(0,40).slice().sort((a,b)=>b.views-a.views).slice(0,5);
+  $("#popular").innerHTML = top.map(i => `<li data-id="${i.id}"><span>${esc(i.title)}</span></li>`).join("");
+}
+function renderClock(){
+  const d = new Date(); const w = worldDate(d);
+  $("#clock").textContent = `${hm(d)} · ${w.day}`;
+  $("#wdate").innerHTML = `<span class="long">${w.full}</span>`;
+}
+function renderAll(){ renderTabs(); renderFeed(); renderTicker(); renderPopular(); renderMarkets(); renderLeague(); }
+
+/* ============ Okuma ekranı ============ */
+let lastFocus = null;
+function openArticle(id){
+  const it = items.find(i=>i.id===id); if (!it) return;
+  lastFocus = document.activeElement;
+  readIds.add(id); it.views += N(20,80);
+  const dl = `<span class="dl">${esc(up(it.place))} (Kuzgun)</span> – `;
+  let body = `<p>${dl}${esc(it.body[0])}</p><p>${esc(it.body[1])}</p>`;
+  if (it.quote) body += `<blockquote>“${esc(it.quote.q)}”<cite>${esc(cap1(it.quote.who))}</cite></blockquote>`;
+  it.body.slice(2,-1).forEach(p => body += `<p>${esc(p)}</p>`);
+  if (it.quote2) body += `<blockquote>“${esc(it.quote2.q)}”<cite>${esc(cap1(it.quote2.who))}</cite></blockquote>`;
+  body += `<p>${esc(it.body[it.body.length-1])}</p>`;
+  let tl = "";
+  if (it.arc){
+    const run = items.filter(x => x.arc && x.arc.run === it.arc.run).sort((a,b)=>a.t-b.t);
+    tl = `<div class="timeline"><h5>Gelişen hikâye · ${esc(it.arc.name)}</h5><ol>` +
+      run.map(x => `<li class="${x.id===it.id?"cur":""}"><time>${hm(x.t)}</time><span>${x.id===it.id?esc(x.title):`<a data-id="${x.id}">${esc(x.title)}</a>`}</span></li>`).join("") +
+      (run[run.length-1].arc.stage < it.arc.total ? `<li class="next"><time>sırada</time><span>Kuzgunlar yeni gelişmeleri bekliyor…</span></li>` : "") + `</ol></div>`;
+  }
+  const rel = items.filter(x => x.cat===it.cat && x.id!==it.id).slice(0,4);
+  const relHtml = rel.length ? `<div class="related"><h5>${CATS[it.cat].label} başlığında diğer haberler</h5><ul>${rel.map(x=>`<li data-id="${x.id}">${esc(x.title)}</li>`).join("")}</ul></div>` : "";
+  const d = new Date(it.t); const w = worldDate(d);
+  $("#sheet").innerHTML = `<button class="close" id="close" aria-label="Kapat">×</button>${metaLine(it)}<h1 id="rTitle">${esc(it.title)}</h1><p class="dek">${esc(it.summary)}</p>
+    <div class="byline"><span><b>${esc(it.author)}</b> · Kuzgun Ajansı</span><span>${w.full}, ${hm(it.t)}</span><span class="num">${fmt(it.views)} okunma</span></div>
+    <div class="img">${scene(it.seed,it.scene)}</div><p class="figcap">${esc(capFor(it))} · Kristal küre görüntüsünden çizim</p>
+    <div class="body">${body}</div>${tl}${relHtml}`;
+  $("#reader").hidden = false; document.body.style.overflow = "hidden";
+  $("#reader").scrollTop = 0; $("#close").focus();
+  document.querySelectorAll(`[data-id="${id}"].story`).forEach(e=>e.classList.add("read"));
+}
+function closeArticle(){
+  $("#reader").hidden = true; document.body.style.overflow = "";
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+  flushIfTop();
+}
+
+/* ============ Canlı akış ============ */
+let timer = null;
+function schedule(){
+  clearTimeout(timer);
+  if (!running) return;
+  const ms = speed*1000*(0.6 + Math.random()*0.8);
+  timer = setTimeout(() => { publish(); schedule(); }, ms);
+}
+function publish(){
+  const it = produce(Date.now());
+  items.unshift(it); if (items.length > 80) items.length = 80;
+  freshIds.add(it.id);
+  const atTop = window.scrollY < 220 && $("#reader").hidden;
+  if (atTop){ renderAll(); } else { pending.push(it.id); renderTabs(); renderTicker(); renderPopular(); renderMarkets(); renderLeague(); showPill(); }
+  if (it.breaking) toast(it);
+  save();
+}
+function showPill(){ const p = $("#pill"); p.textContent = `${pending.length} yeni haber · başa dön`; p.hidden = false; }
+function flushIfTop(){ if (pending.length && window.scrollY < 220 && $("#reader").hidden){ pending = []; $("#pill").hidden = true; renderFeed(); } }
+let toastT = null;
+function toast(it){
+  const el = $("#toast"); $("#toastText").textContent = it.title; el.dataset.id = it.id; el.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove("show"), 7000);
+}
+function tickMarkets(){
+  for (const m of markets){ const v = m.id==="anka"?0.0028:m.id==="mana"?0.0024:0.0016; m.p *= 1 + (Math.random()-0.5)*2*v; m.hist.push(m.p); if (m.hist.length>40) m.hist.shift(); }
+  renderMarkets();
+}
+function tickViews(){
+  const now = Date.now();
+  items.slice(0,40).forEach(i => { const age = (now-i.t)/60000; i.views += Math.round(Math.random()*(i.breaking?40:14)/(1+age/20)); });
+  renderPopular();
+}
+function tickWeather(){
+  const w = R(weather); const n = pickW(); w.k = n.k; w.t = n.t; w.temp = w.base + N(-4,4) + (n.k==="snow"?-6:0) + (n.k==="ash"?5:0); renderWeather();
+}
+
+/* ============ Kayıt ============ */
+const KEY = "kuzgun-haber-v1";
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify({items:items.slice(0,50), arcs, arcQueue, league, week, seq, speed, mk:markets.map(m=>({id:m.id,p:m.p,hist:m.hist,open:m.open,ref:m.ref})), at:Date.now()})); } catch(e){}
+}
+function load(){
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (!s || Date.now()-s.at > 12*3600*1000) { if (s && s.speed) speed = s.speed; return false; }
+    items = s.items || []; arcs = s.arcs || []; arcQueue = s.arcQueue || arcQueue; league = s.league || league; week = s.week || 1; seq = s.seq || 1; speed = s.speed || 20;
+    (s.mk||[]).forEach(x => { const m = mk(x.id); if (m){ m.p=x.p; m.hist=x.hist; m.open=x.open; m.ref=x.ref; } });
+    const missed = Math.min(6, Math.floor((Date.now()-s.at)/(speed*1000)));
+    for (let i=0;i<missed;i++){ const t = s.at + (Date.now()-s.at)*(i+1)/(missed+1); items.unshift(produce(t)); }
+    return items.length > 0;
+  } catch(e){ return false; }
+}
+function seed(){
+  for (let i=0;i<12;i++) matchNews();   // ligin ilk üç haftası oynanmış olsun
+  const n = 16; const span = 3*3600*1000; const now = Date.now();
+  const ts = Array.from({length:n}, () => now - Math.random()*span).sort((a,b)=>a-b);
+  // ilk açılışta bir gelişen hikâyeyi birkaç adım ilerlet
+  const first = arcQueue.shift(); const d = ARCS.find(a=>a.id===first); arcs.push({id:first, run:first+"-"+Date.now(), stage:0, p:d.init(), items:[], last:0});
+  ts.forEach(t => items.unshift(produce(t)));
+  // akış başladığında piyasa referansı sıfırlansın
+  markets.forEach(m => { m.open = m.hist[0]; m.ref = m.p; });
+}
+
+/* ============ Olaylar ============ */
+document.addEventListener("click", e => {
+  const tb = e.target.closest("[data-tab]"); if (tb){ tab = tb.dataset.tab; pending=[]; $("#pill").hidden = true; renderTabs(); renderFeed(); window.scrollTo({top:0}); return; }
+  if (e.target.closest("#close") || e.target.id === "reader"){ closeArticle(); return; }
+  const t = e.target.closest("[data-id]"); if (t){ if (t.id==="toast") t.classList.remove("show"); openArticle(t.dataset.id); return; }
+  if (e.target.closest("#pill")){ pending=[]; $("#pill").hidden = true; renderFeed(); window.scrollTo({top:0, behavior:"smooth"}); return; }
+  if (e.target.closest("#home")){ e.preventDefault(); tab="all"; renderTabs(); renderFeed(); window.scrollTo({top:0, behavior:"smooth"}); }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("#reader").hidden) closeArticle();
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("article.story")){ e.preventDefault(); openArticle(e.target.dataset.id); }
+});
+window.addEventListener("scroll", () => { if (window.scrollY < 220) flushIfTop(); }, {passive:true});
+$("#live").addEventListener("click", () => {
+  running = !running; const b = $("#live"); b.classList.toggle("off", !running); b.setAttribute("aria-pressed", running);
+  b.querySelector("span").textContent = running ? "Canlı" : "Durdu"; if (running){ publish(); } schedule();
+});
+$("#speed").addEventListener("change", e => { speed = +e.target.value; save(); schedule(); });
+
+/* ============ Başlat ============ */
+if (!load()) seed();
+$("#speed").value = String(speed);
+renderClock(); renderAll(); renderWeather(); renderMoons();
+setInterval(renderClock, 15000);
+setInterval(() => document.querySelectorAll("time.ago").forEach(el => el.textContent = ago(+el.dataset.t)), 30000);
+setInterval(tickMarkets, 3000);
+setInterval(tickViews, 9000);
+setInterval(tickWeather, 45000);
+setInterval(renderMoons, 600000);
+save();
+schedule();
+</script>
+</body>
+</html>
