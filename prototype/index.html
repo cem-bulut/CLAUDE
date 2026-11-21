@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#141a33">
+<title>Gökkule</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;600&display=swap">
+<style>
+/* Tek görünüm: gece gökyüzünde yüzen ada. Oyun tuvali tam ekran, arayüz kenarlarda. */
+:root{
+  --night:#141a33; --ink:#f4ecdc; --amber:#f2b54a; --amber-deep:#c9822a;
+  --crystal:#6fe3f2; --danger:#ff6b6b; --panel:rgba(20,26,51,.72); --edge:rgba(244,236,220,.18);
+  --display:"Bungee","Arial Black",system-ui,sans-serif;
+  --body:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var(--ink);font-family:var(--body);
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(10px,env(safe-area-inset-left,0px));
+  right:max(10px,env(safe-area-inset-right,0px));display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+.stats{display:grid;grid-template-columns:repeat(4,auto);gap:4px clamp(8px,2.5vw,14px);background:var(--panel);border:1px solid var(--edge);
+  border-radius:12px;padding:8px 12px;font-variant-numeric:tabular-nums}
+.stats b{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.65;font-weight:600}
+.stats span{font-size:18px;font-weight:600}
+#hearts{color:var(--danger);letter-spacing:2px}
+.next{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:6px;text-align:center}
+.next b{display:block;font-size:10px;letter-spacing:.12em;opacity:.65}
+.spacer{flex:1}
+.tcol{display:grid;gap:6px}
+.btn.tbtn{pointer-events:auto;width:46px;height:46px;flex:none}
+.btn{appearance:none;border:1px solid var(--edge);background:var(--panel);color:var(--ink);font:600 20px/1 var(--body);
+  width:56px;height:56px;border-radius:14px;display:grid;place-items:center;touch-action:none}
+.btn:active,.btn.on{background:var(--amber);color:var(--night)}
+.btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.pad{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);left:max(14px,env(safe-area-inset-left,0px));
+  display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:6px}
+.pad .up{grid-area:1/2}.pad .left{grid-area:2/1}.pad .right{grid-area:2/3}.pad .down{grid-area:3/2}
+.acts{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);right:max(14px,env(safe-area-inset-right,0px));
+  display:grid;grid-template-columns:56px 56px;gap:6px}
+.acts .drop{grid-column:1/3;width:auto;font:16px/1 var(--display);background:var(--amber-deep);color:var(--ink)}
+.toast{position:fixed;left:50%;top:28%;transform:translate(-50%,-50%);font:22px/1.1 var(--display);color:var(--amber);
+  text-shadow:0 3px 0 rgba(0,0,0,.45);pointer-events:none;opacity:0;transition:opacity .25s;text-align:center;white-space:nowrap}
+.toast.show{opacity:1}
+.overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,13,28,.72);z-index:5;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+.card{max-width:420px;text-align:center;display:grid;gap:14px}
+.card h1{font:clamp(40px,12vw,64px)/1 var(--display);margin:0;color:var(--amber);text-shadow:0 5px 0 #6a3f12}
+.card p{margin:0;line-height:1.45;opacity:.9}
+.card ul{text-align:left;margin:0;padding-left:20px;line-height:1.5;font-size:15px}
+.card .go{justify-self:center;width:auto;padding:0 28px;font:18px/1 var(--display);background:var(--amber);color:var(--night);border:0}
+.hint{font-size:13px;opacity:.6}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <div class="stats">
+    <div><b>Puan</b><span id="score">0</span></div>
+    <div><b>Kristal</b><span id="crys">0</span></div>
+    <div><b>Kat</b><span id="level">1</span></div>
+    <div><b>Can</b><span id="hearts">♥♥♥</span></div>
+  </div>
+  <div class="next"><b>SIRADAKİ</b><canvas id="nextc" width="56" height="56"></canvas></div>
+  <div class="spacer"></div>
+  <div class="tcol">
+    <button class="btn tbtn" id="camBtn" aria-label="Kamerayı döndür">⟲</button>
+    <button class="btn tbtn" id="pauseBtn" aria-label="Duraklat">❚❚</button>
+  </div>
+</div>
+
+<div class="pad">
+  <button class="btn up" data-act="up" aria-label="İleri">▲</button>
+  <button class="btn left" data-act="left" aria-label="Sol">◀</button>
+  <button class="btn right" data-act="right" aria-label="Sağ">▶</button>
+  <button class="btn down" data-act="down" aria-label="Geri">▼</button>
+</div>
+<div class="acts">
+  <button class="btn" data-act="rotY" aria-label="Yatay döndür">↻</button>
+  <button class="btn" data-act="rotH" aria-label="Devir">⤵</button>
+  <button class="btn drop" data-act="drop">BIRAK</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="overlay">
+  <div class="card">
+    <h1>GÖKKULE</h1>
+    <p>Gezgin Ada, yüzen bir adanın taş kuyusunda mahsur. Düşen blokları yerleştirip ona merdiven ör, havada süzülen <b style="color:var(--crystal)">kristallere</b> ulaştır.</p>
+    <ul>
+      <li>Sol tuşlar bloğu kaydırır, ↻ ve ⤵ döndürür, <b>BIRAK</b> hemen düşürür.</li>
+      <li>Bir zemine dokun: Ada oraya yürür (1 basamak çıkar, 2 basamak iner).</li>
+      <li>Tam dolan kat silinir, kule alçalır. Güvende kalırsın ama kristal uzaklaşır.</li>
+      <li>Bloğu Ada'nın kafasına düşürme. Yan kaydırma kamerayı çevirir.</li>
+    </ul>
+    <button class="btn go" id="startBtn">BAŞLA</button>
+    <div class="hint" id="best"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+"use strict";
+const W = 6, D = 6, H = 16, LIMIT = 12;
+const $ = id => document.getElementById(id);
+const idx = (x, y, z) => x + W * (z + D * y);
+const wx = x => x + 0.5 - W / 2, wz = z => z + 0.5 - D / 2;
+
+// ---------- Şekiller (düz parçalar katları doldurur, 3B parçalar tırmanmaya yarar)
+const SHAPES = [
+  { n: "Sütun",   c: 0x5ec8e5, b: [[-1,0,0],[0,0,0],[1,0,0],[2,0,0]] },
+  { n: "Kare",    c: 0xf2c14e, b: [[0,0,0],[1,0,0],[0,0,1],[1,0,1]] },
+  { n: "Tepe",    c: 0xb784f2, b: [[-1,0,0],[0,0,0],[1,0,0],[0,0,1]] },
+  { n: "Kanca",   c: 0xf28c4e, b: [[-1,0,0],[0,0,0],[1,0,0],[1,0,1]] },
+  { n: "Yılan",   c: 0x7fd36b, b: [[-1,0,1],[0,0,1],[0,0,0],[1,0,0]] },
+  { n: "Köşe",    c: 0xe85d75, b: [[0,0,0],[1,0,0],[0,0,1]] },
+  { n: "Üçayak",  c: 0x4fb3a0, b: [[0,0,0],[1,0,0],[0,1,0],[0,0,1]] },
+  { n: "Burgu",   c: 0xd9a0c8, b: [[0,0,0],[1,0,0],[0,1,0],[0,1,1]] },
+  { n: "Basamak", c: 0xa7b5d6, b: [[0,0,0],[1,0,0],[1,1,0]] },
+];
+
+// ---------- Durum
+let grid, piece, nextId, bag, score, level, crystals, hearts, lines, running, paused, dropT, crystal, hurtFlash;
+const hero = { x: 0, z: 0, path: [], t: 0, fx: 0, fz: 0, fy: 0, ty: 0, walking: false };
+let camA = 0, camAngle = 0.5;
+
+const top = (x, z) => { for (let y = H - 1; y >= 0; y--) if (grid[idx(x, y, z)]) return y + 1; return 0; };
+const maxTop = () => { let m = 0; for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) m = Math.max(m, top(x, z)); return m; };
+const rnd = n => Math.floor(Math.random() * n);
+
+function nextShape() {
+  if (!bag.length) { bag = SHAPES.map((_, i) => i); for (let i = bag.length - 1; i > 0; i--) { const j = rnd(i + 1); [bag[i], bag[j]] = [bag[j], bag[i]]; } }
+  return bag.pop();
+}
+
+// ---------- Three.js sahnesi
+const canvas = $("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+{
+  const g = document.createElement("canvas"); g.width = 2; g.height = 256;
+  const ctx = g.getContext("2d"); const gr = ctx.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, "#0d1230"); gr.addColorStop(0.55, "#2b2f63"); gr.addColorStop(1, "#c4746a");
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, 2, 256);
+  const tex = new THREE.CanvasTexture(g); tex.encoding = THREE.sRGBEncoding; scene.background = tex;
+}
+scene.fog = new THREE.Fog(0x2b2f63, 22, 55);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 120);
+
+scene.add(new THREE.HemisphereLight(0xbcd4ff, 0x4a2a3a, 0.75));
+const sun = new THREE.DirectionalLight(0xffe2b8, 1.05);
+sun.position.set(7, 16, 9); sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 12, bottom: -6, near: 1, far: 40 });
+scene.add(sun);
+
+// Yüzen ada
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x6b5a6e, roughness: 0.95, flatShading: true });
+const island = new THREE.Mesh(new THREE.CylinderGeometry(5.6, 1.0, 6, 9, 2), rockMat);
+island.position.y = -3.3; island.receiveShadow = true; scene.add(island);
+const grass = new THREE.Mesh(new THREE.CylinderGeometry(5.75, 5.6, 0.5, 9), new THREE.MeshStandardMaterial({ color: 0x5f9a5a, roughness: 0.9, flatShading: true }));
+grass.position.y = -0.27; grass.receiveShadow = true; scene.add(grass);
+const floor = new THREE.Mesh(new THREE.BoxGeometry(W, 0.1, D), new THREE.MeshStandardMaterial({ color: 0x9c8f86, roughness: 1 }));
+floor.position.y = -0.05; floor.receiveShadow = true; scene.add(floor);
+const gridH = new THREE.GridHelper(W, W, 0x4a4060, 0x4a4060); gridH.position.y = 0.005; scene.add(gridH);
+// Köşe dikilitaşları
+const pillarMat = new THREE.MeshStandardMaterial({ color: 0x8a7f95, roughness: 0.8, flatShading: true });
+for (const [px, pz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+  const p = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.2, 0.35), pillarMat);
+  p.position.set(px * (W / 2 + 0.3), 1.0, pz * (D / 2 + 0.3)); p.castShadow = true; scene.add(p);
+  const rune = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshBasicMaterial({ color: 0xf2b54a }));
+  rune.position.set(p.position.x, 2.35, p.position.z); scene.add(rune);
+}
+// Kuyu çerçevesi ve tehlike çizgisi
+const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, LIMIT, D)),
+  new THREE.LineBasicMaterial({ color: 0xf4ecdc, transparent: true, opacity: 0.12 }));
+frame.position.y = LIMIT / 2; scene.add(frame);
+const dangerMat = new THREE.LineBasicMaterial({ color: 0xff6b6b, transparent: true, opacity: 0.6 });
+const danger = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(-W / 2, 0, -D / 2), new THREE.Vector3(W / 2, 0, -D / 2), new THREE.Vector3(W / 2, 0, D / 2), new THREE.Vector3(-W / 2, 0, D / 2)]), dangerMat);
+danger.position.y = LIMIT; scene.add(danger);
+// Çevredeki yüzen kayalar
+const floaters = [];
+for (let i = 0; i < 10; i++) {
+  const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4 + Math.random() * 0.9, 0), rockMat);
+  const a = (i / 10) * Math.PI * 2, d = 10 + Math.random() * 6;
+  r.userData = { a, d, y: -3 + Math.random() * 12, s: 0.03 + Math.random() * 0.05 };
+  scene.add(r); floaters.push(r);
+}
+// Yıldızlar
+{
+  const pts = []; for (let i = 0; i < 400; i++) { const v = new THREE.Vector3().setFromSphericalCoords(60, Math.random() * Math.PI * 0.5, Math.random() * Math.PI * 2); pts.push(v); }
+  scene.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts), new THREE.PointsMaterial({ color: 0xffffff, size: 0.25, fog: false })));
+}
+
+// Bloklar
+const boxGeo = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+const blockMat = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.05 });
+const blocks = new THREE.InstancedMesh(boxGeo, blockMat, W * D * H);
+blocks.castShadow = blocks.receiveShadow = true; scene.add(blocks);
+const tmpM = new THREE.Matrix4(), tmpC = new THREE.Color();
+for (let i = 0; i < W * D * H; i++) blocks.setColorAt(i, tmpC.set(0xffffff));
+let instCells = [];
+function rebuildBlocks() {
+  let n = 0; instCells = [];
+  for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+    const c = grid[idx(x, y, z)]; if (!c) continue;
+    tmpM.makeTranslation(wx(x), y + 0.5, wz(z)); blocks.setMatrixAt(n, tmpM);
+    tmpC.set(c).offsetHSL(0, 0, y % 2 ? -0.07 : 0).convertSRGBToLinear(); blocks.setColorAt(n, tmpC);
+    instCells[n++] = [x, y, z];
+  }
+  blocks.count = n; blocks.instanceMatrix.needsUpdate = true; blocks.instanceColor.needsUpdate = true;
+}
+const pieceMesh = new THREE.InstancedMesh(boxGeo, new THREE.MeshStandardMaterial({ roughness: 0.4, emissive: 0x222222 }), 8);
+pieceMesh.castShadow = true; scene.add(pieceMesh);
+for (let i = 0; i < 8; i++) pieceMesh.setColorAt(i, tmpC.set(0xffffff));
+const ghostMesh = new THREE.InstancedMesh(boxGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false }), 8);
+scene.add(ghostMesh);
+
+// Kristal
+const crystalMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.32), new THREE.MeshStandardMaterial({ color: 0x6fe3f2, emissive: 0x2aa9c0, emissiveIntensity: 0.9, roughness: 0.2 }));
+const crystalLight = new THREE.PointLight(0x6fe3f2, 1.2, 5);
+const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0x6fe3f2, transparent: true, opacity: 0.25, depthWrite: false }));
+scene.add(crystalMesh, crystalLight, beam);
+
+// Kahraman: Gezgin Ada
+const heroG = new THREE.Group();
+{
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.24, 0.45, 8), new THREE.MeshStandardMaterial({ color: 0xe8a33d, flatShading: true }));
+  body.position.y = 0.23; body.castShadow = true;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf3d2b0 }));
+  head.position.y = 0.6; head.castShadow = true;
+  const hat = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.28, 8), new THREE.MeshStandardMaterial({ color: 0x3f6fb5, flatShading: true }));
+  hat.position.y = 0.82; hat.castShadow = true;
+  const pack = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.24, 0.12), new THREE.MeshStandardMaterial({ color: 0x7a4b2a }));
+  pack.position.set(0, 0.3, -0.2);
+  heroG.add(body, head, hat, pack);
+}
+scene.add(heroG);
+const marker = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.42, 20), new THREE.MeshBasicMaterial({ color: 0xf2b54a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+marker.rotation.x = -Math.PI / 2; scene.add(marker);
+
+// Parçacıklar
+const PN = 160;
+const parts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.18, 0.18, 0.18), new THREE.MeshBasicMaterial({ color: 0xffffff }), PN);
+const pdata = Array.from({ length: PN }, () => ({ life: 0, p: new THREE.Vector3(), v: new THREE.Vector3() }));
+for (let i = 0; i < PN; i++) parts.setColorAt(i, tmpC.set(0xffffff));
+scene.add(parts);
+let pcur = 0;
+function burst(x, y, z, color, n = 6, speed = 4) {
+  for (let i = 0; i < n; i++) {
+    const d = pdata[pcur]; parts.setColorAt(pcur, tmpC.set(color).convertSRGBToLinear()); pcur = (pcur + 1) % PN;
+    d.life = 0.9; d.p.set(x, y, z); d.v.set((Math.random() - 0.5) * speed, Math.random() * speed, (Math.random() - 0.5) * speed);
+  }
+  parts.instanceColor.needsUpdate = true;
+}
+
+// ---------- Oyun mantığı
+function collide(cells, px, py, pz) {
+  for (const [cx, cy, cz] of cells) {
+    const X = px + cx, Y = py + cy, Z = pz + cz;
+    if (X < 0 || X >= W || Z < 0 || Z >= D || Y < 0) return true;
+    if (Y < H && grid[idx(X, Y, Z)]) return true;
+  }
+  return false;
+}
+function spawn() {
+  const s = SHAPES[nextId]; nextId = nextShape();
+  piece = { cells: s.b.map(c => c.slice()), x: 2, y: H - 2, z: 2, c: s.c };
+  if (collide(piece.cells, piece.x, piece.y, piece.z)) return gameOver("Kuyu tıkandı");
+  drawNext();
+}
+function camDirs() {
+  const th = camA * Math.PI / 2 + 0.5;
+  const snap = (x, z) => Math.abs(x) > Math.abs(z) ? [Math.sign(x), 0] : [0, Math.sign(z)];
+  const f = snap(-Math.sin(th), -Math.cos(th));
+  const r = [-f[1], f[0]];
+  return { f, r };
+}
+function tryMove(dx, dy, dz) {
+  if (!piece) return false;
+  if (collide(piece.cells, piece.x + dx, piece.y + dy, piece.z + dz)) return false;
+  piece.x += dx; piece.y += dy; piece.z += dz; return true;
+}
+const KICKS = [[0,0,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0],[2,0,0],[-2,0,0],[0,0,2],[0,0,-2],[0,2,0]];
+function rotate(fn) {
+  if (!piece) return;
+  const cells = piece.cells.map(fn);
+  for (const [kx, ky, kz] of KICKS) {
+    if (!collide(cells, piece.x + kx, piece.y + ky, piece.z + kz)) {
+      piece.cells = cells; piece.x += kx; piece.y += ky; piece.z += kz; return;
+    }
+  }
+}
+const rotY = ([x, y, z]) => [-z, y, x];
+const rotX = ([x, y, z]) => [x, -z, y];
+const rotZ = ([x, y, z]) => [-y, x, z];
+
+function act(a) {
+  if (!running || paused) return;
+  const { f, r } = camDirs();
+  if (a === "up") tryMove(f[0], 0, f[1]);
+  else if (a === "down") tryMove(-f[0], 0, -f[1]);
+  else if (a === "right") tryMove(r[0], 0, r[1]);
+  else if (a === "left") tryMove(-r[0], 0, -r[1]);
+  else if (a === "rotY") rotate(rotY);
+  else if (a === "rotH") rotate(r[0] !== 0 ? rotX : rotZ);
+  else if (a === "drop") { let n = 0; while (tryMove(0, -1, 0)) n++; score += n * 2; lock(); }
+}
+
+function lock() {
+  const p = piece; if (!p) return;
+  let hurt = false, over = false;
+  for (const [cx, cy, cz] of p.cells) {
+    const X = p.x + cx, Y = p.y + cy, Z = p.z + cz;
+    if (Y >= LIMIT) over = true;
+    if (Y < H) grid[idx(X, Y, Z)] = p.c;
+    if (X === hero.x && Z === hero.z) hurt = true;
+  }
+  piece = null;
+  if (hurt) {
+    hearts--; hurtFlash = 0.6; toast("AH! Kafama düştü"); vibrate(120);
+    burst(wx(hero.x), top(hero.x, hero.z) + 0.6, wz(hero.z), 0xff6b6b, 10);
+    hero.path = []; hero.walking = false;
+  }
+  // Kat silme
+  let cleared = 0;
+  for (let y = 0; y < H; y++) {
+    let full = true;
+    for (let i = 0; i < W * D && full; i++) if (!grid[y * W * D + i]) full = false;
+    if (!full) continue;
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) if ((x + z) % 2 === 0) burst(wx(x), y + 0.5, wz(z), grid[idx(x, y, z)], 2, 5);
+    grid.copyWithin(y * W * D, (y + 1) * W * D); grid.fill(0, (H - 1) * W * D);
+    cleared++; y--;
+  }
+  if (cleared) {
+    lines += cleared;
+    score += [0, 100, 300, 600, 1000][Math.min(cleared, 4)] * level;
+    toast(cleared > 1 ? cleared + " KAT SİLİNDİ!" : "KAT SİLİNDİ"); vibrate(40);
+    if (lines % 5 === 0 && hearts < 3) { hearts++; toast("Can kazandın"); }
+  }
+  rebuildBlocks();
+  if (hearts <= 0) return gameOver("Ada yoruldu");
+  if (over && maxTop() > LIMIT) return gameOver("Kule sınırı aştı");
+  checkCrystal();
+  spawn(); updateHud();
+}
+
+function placeCrystal() {
+  const want = Math.min(LIMIT - 1, Math.max(2, maxTop() + 2 + rnd(2)));
+  for (let tries = 0; tries < 60; tries++) {
+    const x = rnd(W), z = rnd(D);
+    if (x === hero.x && z === hero.z) continue;
+    if (top(x, z) < want) { crystal = { x, z, y: want }; return; }
+  }
+  crystal = { x: (hero.x + 3) % W, z: (hero.z + 3) % D, y: LIMIT - 1 };
+}
+function checkCrystal() {
+  if (!crystal) return;
+  if (top(crystal.x, crystal.z) > crystal.y) {
+    burst(wx(crystal.x), crystal.y + 0.6, wz(crystal.z), 0x6fe3f2, 12);
+    toast("Kristal ezildi"); placeCrystal(); return;
+  }
+  if (!hero.walking && hero.x === crystal.x && hero.z === crystal.z && top(hero.x, hero.z) === crystal.y) collect();
+}
+function collect() {
+  burst(wx(crystal.x), crystal.y + 0.6, wz(crystal.z), 0x6fe3f2, 18, 6);
+  crystals++; score += 500 * level; vibrate(60);
+  if (crystals % 3 === 0) { level++; toast("KAT " + level + "! Bloklar hızlanıyor"); } else toast("+" + 500 * (level) + " KRİSTAL");
+  placeCrystal(); updateHud();
+}
+
+// Kahraman yol bulma: 1 yukarı, 2 aşağı
+function findPath(tx, tz) {
+  const start = hero.x + W * hero.z, goal = tx + W * tz;
+  const prev = new Map([[start, -1]]), q = [start];
+  while (q.length) {
+    const c = q.shift(); if (c === goal) break;
+    const cx = c % W, cz = (c / W) | 0, ch = top(cx, cz);
+    for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = cx + dx, nz = cz + dz; if (nx < 0 || nx >= W || nz < 0 || nz >= D) continue;
+      const n = nx + W * nz; if (prev.has(n)) continue;
+      const dh = top(nx, nz) - ch; if (dh > 1 || dh < -2) continue;
+      prev.set(n, c); q.push(n);
+    }
+  }
+  if (!prev.has(goal)) return null;
+  const path = []; for (let c = goal; c !== start; c = prev.get(c)) path.unshift([c % W, (c / W) | 0]);
+  return path;
+}
+function walkTo(x, z) {
+  if (!running || paused) return;
+  marker.position.set(wx(x), top(x, z) + 0.02, wz(z));
+  const path = findPath(x, z);
+  if (!path) { marker.material.color.set(0xff6b6b); marker.material.opacity = 0.9; toast("Oraya yol yok"); return; }
+  marker.material.color.set(0xf2b54a); marker.material.opacity = 0.9;
+  hero.path = path; if (!hero.walking) nextStep();
+}
+function nextStep() {
+  const s = hero.path.shift(); if (!s) { hero.walking = false; checkCrystal(); return; }
+  const dh = top(s[0], s[1]) - top(hero.x, hero.z);
+  if (dh > 1 || dh < -2) { hero.path = []; hero.walking = false; toast("Yol değişti"); return; }
+  hero.fx = wx(hero.x); hero.fz = wz(hero.z); hero.fy = top(hero.x, hero.z);
+  hero.x = s[0]; hero.z = s[1]; hero.ty = top(hero.x, hero.z);
+  heroG.rotation.y = Math.atan2(wx(hero.x) - hero.fx, wz(hero.z) - hero.fz);
+  hero.t = 0; hero.walking = true;
+}
+
+// ---------- Arayüz
+let toastT;
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 1300); }
+function vibrate(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
+function updateHud() {
+  $("score").textContent = score; $("crys").textContent = crystals; $("level").textContent = level;
+  $("hearts").textContent = "♥".repeat(Math.max(hearts, 0)) + "♡".repeat(Math.max(3 - hearts, 0));
+}
+function drawNext() {
+  const cv = $("nextc"), ctx = cv.getContext("2d"); ctx.clearRect(0, 0, 56, 56);
+  const s = SHAPES[nextId], col = "#" + s.c.toString(16).padStart(6, "0");
+  const xs = s.b.map(b => b[0] - b[2] * 0.5), ys = s.b.map(b => b[2] * 0.5 - b[1]);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  [...s.b].sort((a, b) => (a[1] - b[1]) || (b[2] - a[2])).forEach(([x, y, z]) => {
+    const px = 28 + (x - z * 0.5 - cx) * 11 - 5, py = 28 + (z * 0.5 - y - cy) * 11 - 5;
+    ctx.fillStyle = col; ctx.fillRect(px, py, 10, 10);
+    ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(px, py, 10, 3);
+  });
+}
+function bestScore() { try { return +localStorage.getItem("gokkule.best") || 0; } catch (e) { return 0; } }
+function saveBest(v) { try { localStorage.setItem("gokkule.best", v); } catch (e) {} }
+
+function start() {
+  grid = new Uint32Array(W * D * H); bag = []; nextId = nextShape();
+  score = 0; level = 1; crystals = 0; hearts = 3; lines = 0; dropT = 0; hurtFlash = 0;
+  Object.assign(hero, { x: 0, z: 5, path: [], walking: false });
+  // Başlangıç zemini: birkaç taş, ilk merdiven fikri versin
+  for (const [x, z, h] of [[1,5,1],[2,5,1],[2,4,2],[5,0,1],[4,0,1],[5,1,1],[0,0,1],[3,3,1]]) for (let y = 0; y < h; y++) grid[idx(x, y, z)] = 0x8d7f74;
+  rebuildBlocks(); placeCrystal(); spawn();
+  running = true; paused = false; $("overlay").hidden = true; updateHud();
+}
+function gameOver(why) {
+  running = false; piece = null; updateHud();
+  const best = Math.max(bestScore(), score); saveBest(best);
+  $("overlay").hidden = false;
+  $("overlay").querySelector("h1").textContent = "OYUN BİTTİ";
+  $("overlay").querySelector("p").innerHTML = why + ". Puan <b>" + score + "</b>, kristal <b>" + crystals + "</b>, silinen kat <b>" + lines + "</b>.";
+  $("overlay").querySelector("ul").hidden = true;
+  $("startBtn").textContent = "TEKRAR";
+  $("best").textContent = "En iyi puan: " + best;
+}
+$("best").textContent = bestScore() ? "En iyi puan: " + bestScore() : "Telefonda en iyi deneyim için dikey tut.";
+$("startBtn").addEventListener("click", start);
+$("camBtn").addEventListener("click", () => { camA = (camA + 1) % 4; });
+$("pauseBtn").addEventListener("click", () => { if (!running) return; paused = !paused; $("pauseBtn").classList.toggle("on", paused); toast(paused ? "DURAKLATILDI" : "DEVAM"); });
+
+// Basılı tutunca tekrar eden tuşlar
+document.querySelectorAll("[data-act]").forEach(b => {
+  let rep, del;
+  const stop = () => { clearTimeout(del); clearInterval(rep); };
+  b.addEventListener("pointerdown", e => {
+    e.preventDefault(); const a = b.dataset.act; act(a);
+    if (["up", "down", "left", "right"].includes(a)) del = setTimeout(() => { rep = setInterval(() => act(a), 110); }, 260);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, stop));
+});
+window.addEventListener("keydown", e => {
+  const map = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", q: "rotY", e: "rotH", " ": "drop" };
+  if (map[e.key]) { e.preventDefault(); act(map[e.key]); }
+  else if (e.key === "c") camA = (camA + 1) % 4;
+  else if ("ijkl".includes(e.key) && e.key && running) {
+    const { f, r } = camDirs(); const d = { i: f, k: [-f[0], -f[1]], l: r, j: [-r[0], -r[1]] }[e.key];
+    const nx = hero.x + d[0], nz = hero.z + d[1]; if (nx >= 0 && nx < W && nz >= 0 && nz < D) walkTo(nx, nz);
+  }
+});
+
+// Dokunma: kısa dokunuş = yürü, yatay kaydırma = kamera
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let down = null;
+canvas.addEventListener("pointerdown", e => { down = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener("pointerup", e => {
+  if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y; down = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) { camA = (camA + (dx < 0 ? 1 : 3)) % 4; return; }
+  if (Math.hypot(dx, dy) > 12) return;
+  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects([blocks, floor]);
+  for (const h of hits) {
+    if (h.object === blocks && h.instanceId !== undefined && instCells[h.instanceId]) { const [x, , z] = instCells[h.instanceId]; return walkTo(x, z); }
+    if (h.object === floor) {
+      const x = Math.floor(h.point.x + W / 2), z = Math.floor(h.point.z + D / 2);
+      if (x >= 0 && x < W && z >= 0 && z < D) return walkTo(x, z);
+    }
+  }
+});
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize); resize();
+
+// ---------- Döngü
+const clock = new THREE.Clock();
+let elapsed = 0;
+function frameLoop() {
+  const dt = Math.min(clock.getDelta(), 0.05); elapsed += dt;
+  const live = running && !paused;
+  if (live && piece) {
+    dropT += dt;
+    const interval = Math.max(0.15, 1.0 - (level - 1) * 0.09);
+    if (dropT >= interval) { dropT = 0; if (!tryMove(0, -1, 0)) lock(); }
+  }
+  // Kamera
+  const target = camA * Math.PI / 2 + 0.5;
+  let diff = target - camAngle; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); camAngle += diff * Math.min(1, dt * 8);
+  const aspect = camera.aspect, rad = aspect < 1 ? 13 + (1 / aspect - 1) * 7 : 13;
+  const focus = grid ? 3 + Math.min(maxTop(), 10) * 0.35 : 3;
+  camera.position.set(Math.sin(camAngle) * rad, focus + 8.5, Math.cos(camAngle) * rad);
+  camera.lookAt(0, focus + (aspect < 1 ? 1.2 : 0), 0);
+
+  // Düşen parça + hayalet
+  if (piece) {
+    let gy = piece.y; while (!collide(piece.cells, piece.x, gy - 1, piece.z)) gy--;
+    piece.cells.forEach(([cx, cy, cz], i) => {
+      tmpM.makeTranslation(wx(piece.x + cx), piece.y + cy + 0.5, wz(piece.z + cz)); pieceMesh.setMatrixAt(i, tmpM);
+      pieceMesh.setColorAt(i, tmpC.set(piece.c).convertSRGBToLinear());
+      tmpM.makeTranslation(wx(piece.x + cx), gy + cy + 0.5, wz(piece.z + cz)); ghostMesh.setMatrixAt(i, tmpM);
+    });
+    pieceMesh.count = ghostMesh.count = piece.cells.length;
+    pieceMesh.instanceMatrix.needsUpdate = ghostMesh.instanceMatrix.needsUpdate = true;
+    pieceMesh.instanceColor.needsUpdate = true;
+  } else pieceMesh.count = ghostMesh.count = 0;
+
+  // Kahraman
+  if (grid) {
+    if (hero.walking && live) {
+      hero.t += dt / 0.2;
+      const t = Math.min(hero.t, 1), hx = wx(hero.x), hz = wz(hero.z);
+      heroG.position.set(hero.fx + (hx - hero.fx) * t, hero.fy + (hero.ty - hero.fy) * t + Math.sin(t * Math.PI) * 0.35, hero.fz + (hz - hero.fz) * t);
+      if (hero.t >= 1) { if (crystal && hero.x === crystal.x && hero.z === crystal.z && top(hero.x, hero.z) === crystal.y) { hero.walking = false; hero.path = []; collect(); } else nextStep(); }
+    } else if (!hero.walking) {
+      const hy = top(hero.x, hero.z), cur = heroG.position.y;
+      heroG.position.set(wx(hero.x), cur > hy ? Math.max(hy, cur - dt * 9) : hy, wz(hero.z));
+      heroG.children[0].scale.y = 1 + Math.sin(elapsed * 3) * 0.03;
+    }
+    heroG.visible = hurtFlash <= 0 || Math.floor(elapsed * 20) % 2 === 0;
+    hurtFlash -= dt;
+  }
+  marker.material.opacity = Math.max(0, marker.material.opacity - dt * 0.9);
+
+  // Kristal
+  if (crystal) {
+    const cy = crystal.y + 0.55 + Math.sin(elapsed * 2.2) * 0.08;
+    crystalMesh.position.set(wx(crystal.x), cy, wz(crystal.z)); crystalMesh.rotation.y += dt * 1.5;
+    crystalLight.position.copy(crystalMesh.position);
+    const base = top(crystal.x, crystal.z), len = Math.max(0.01, cy - base);
+    beam.scale.y = len; beam.position.set(wx(crystal.x), base + len / 2, wz(crystal.z));
+  }
+  dangerMat.opacity = grid && maxTop() >= LIMIT - 2 ? 0.5 + Math.sin(elapsed * 8) * 0.4 : 0.35;
+
+  floaters.forEach(r => { const u = r.userData; u.a += u.s * dt; r.position.set(Math.cos(u.a) * u.d, u.y + Math.sin(elapsed + u.d) * 0.4, Math.sin(u.a) * u.d); r.rotation.x += dt * 0.2; });
+  island.position.y = -3.3 + Math.sin(elapsed * 0.6) * 0.04;
+
+  // Parçacıklar
+  for (let i = 0; i < PN; i++) {
+    const d = pdata[i];
+    if (d.life > 0) { d.life -= dt; d.v.y -= 9 * dt; d.p.addScaledVector(d.v, dt); const s = Math.max(d.life, 0) / 0.9; tmpM.makeScale(s, s, s).setPosition(d.p); }
+    else tmpM.makeScale(0, 0, 0);
+    parts.setMatrixAt(i, tmpM);
+  }
+  parts.instanceMatrix.needsUpdate = true;
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(frameLoop);
+}
+requestAnimationFrame(frameLoop);
+})();
+</script>
+</body>
+</html>
