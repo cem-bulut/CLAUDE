@@ -44,7 +44,12 @@ Notlar:
 ## Doğum Günü Mumu (mobil uygulama)
 
 Telefonun mikrofonuna üfleyince mumlar söner, havai fişekler patlar ve "İyi ki doğdun" şarkısı çalar.
-[Capacitor](https://capacitorjs.com) ile Android ve iOS uygulaması olarak paketlenmiştir. Aynı dosyalar tarayıcıda yüklenebilir bir PWA olarak da çalışır.
+[Capacitor](https://capacitorjs.com) ile Android ve iOS uygulaması olarak paketlenmiştir.
+
+**Üfleme algılama:** Uygulama önce 2 sn ortam sesini dinler, sonra bir *deneme üflemesi* ister (mumlar bu sırada sönmez).
+Eşik, ölçülen gürültü ile senin gerçek üflemen arasına yerleşir; böylece arabada gibi gürültülü yerlerde de çalışır.
+Mikrofondaki rüzgâr sesi alçak frekans ağırlıklı olduğundan; hızlanma, cam açma, tümsek veya konuşma üfleme sayılmaz.
+Ortam değişirse **🎯 Yeniden ayarla** ile ölçüm tekrarlanır. Aynı dosyalar tarayıcıda yüklenebilir bir PWA olarak da çalışır.
 
 ```
 dogum-gunu/

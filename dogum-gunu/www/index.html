@@ -48,9 +48,8 @@
   #meter { position:relative; width:min(70vw, 260px); height:8px; border-radius:8px; background:rgba(255,255,255,.12); }
   #meter > div { height:100%; width:0%; background:linear-gradient(90deg, #6fe3ff, #9b8cff, #ff7eb6); border-radius:8px; transition:width .08s linear; }
   #meter::after { content:""; position:absolute; left:62.5%; top:-4px; bottom:-4px; width:2px; border-radius:2px; background:rgba(255,255,255,.7); }
-  #sens { display:flex; align-items:center; gap:4px; font-size:13px; color:var(--muted); }
-  #sens button { font-size:13px; font-weight:600; padding:5px 10px; background:rgba(255,255,255,.1); color:var(--text); box-shadow:none; }
-  #sens button.on { background:linear-gradient(180deg, #ffe08a, #ffb84d); color:#1b1035; }
+  #micTools { display:flex; gap:6px; min-height:28px; }
+  #micTools button { font-size:13px; font-weight:600; padding:5px 12px; background:rgba(255,255,255,.1); color:var(--text); box-shadow:none; }
 
   /* ---------- Pasta ---------- */
   .cake { position:relative; width:min(78vw, 320px); margin-top:90px; cursor:pointer; }
@@ -155,8 +154,9 @@
   <div id="hint">Mumları üfle! 🌬️</div>
   <div id="micBox" class="hidden">
     <div id="meter"><div></div></div>
-    <div id="sens">Hassasiyet:
-      <button data-s="0">Düşük</button><button data-s="1">Normal</button><button data-s="2">Yüksek</button>
+    <div id="micTools">
+      <button id="skipBtn" class="hidden">Denemeyi atla</button>
+      <button id="recalBtn" class="hidden">🎯 Yeniden ayarla</button>
     </div>
   </div>
 
@@ -198,11 +198,7 @@
   let state = 'setup';            // setup | blowing | party
   let personName = '', age = 0;
   let candles = [];
-  let calibUntil = 0, calibSum = null, calibN = 0, floor = null;
-  // Üfleme, ortam gürültüsünün kaç dB üstünde olmalı (Düşük / Normal / Yüksek hassasiyet)
-  const SENS_DB = [19, 14, 9];
-  let sens = 1;
-  try { const v = parseInt(localStorage.getItem('mum-hassasiyet'), 10); if (v >= 0 && v <= 2) sens = v; } catch (e) {}
+  let calibSum = null, calibN = 0, floor = null;
   let smooth = 0, tapBoost = 0, lastT = performance.now();
 
   const CANDLE_COLORS = ['#ff7eb6', '#6fe3ff', '#ffd86b', '#9bff9b', '#b59bff', '#ff9d6b'];
@@ -247,17 +243,17 @@
       src.connect(analyser);
       timeData = new Float32Array(analyser.fftSize);
       freqData = new Float32Array(analyser.frequencyBinCount);
-      // 250 Hz – 4 kHz arası 12 logaritmik bant. Araba/motor uğultusunun yoğun olduğu
-      // alçak frekanslar dışarıda kalır; üfleme ise bu aralığın tamamında güçlü ses üretir.
+      // 100 Hz – 2 kHz arası 12 logaritmik bant. Mikrofona üflemek rüzgâr uğultusu üretir;
+      // enerjisi bu aralıkta (özellikle 500 Hz altında) yoğunlaşır. Motorun en alçak
+      // uğultusu (100 Hz altı) ve tiz sesler dışarıda kalır.
       const hz = audioCtx.sampleRate / analyser.fftSize;
       bands = [];
       for (let i = 0; i < 12; i++) {
-        const lo = Math.floor(250 * Math.pow(16, i / 12) / hz);
-        const hi = Math.max(lo + 1, Math.floor(250 * Math.pow(16, (i + 1) / 12) / hz));
+        const lo = Math.max(1, Math.floor(100 * Math.pow(20, i / 12) / hz));
+        const hi = Math.max(lo + 1, Math.floor(100 * Math.pow(20, (i + 1) / 12) / hz));
         bands.push([lo, hi]);
       }
-      floor = null; calibSum = new Array(bands.length).fill(0); calibN = 0; hist = []; histT = 0; blowOn = 0;
-      calibUntil = performance.now() + 1000;   // ilk 1 sn ortam gürültüsünü ölç
+      resetDetect(phase === 'live');
       return true;
     } catch (e) {
       return false;
@@ -287,12 +283,31 @@
     return lv;
   }
 
-  // Üfleme gücü (0–1) ve ölçer için oran.
-  // Ortam gürültüsü tabanı, her bant için son 4 sn'nin alt çeyreğidir (25. yüzdelik):
-  // kalıcı gürültü artışları (hızlanma, cam açma, yol değişimi) 3 sn içinde "normal" sayılır,
-  // birkaç saniyelik üfleme ise tabanı yukarı çekemez.
-  const HIST_STEP = .1, HIST_LEN = 40;
-  let hist = [], histT = 0, blowOn = 0, blowGap = 0;
+  // ---------- Üfleme algılama ----------
+  // Gürültü ve üfleme seviyeleri telefona, ortama ve kişiye göre çok değişir; sabit bir eşik
+  // ya arabada kendiliğinden söner ya da üflemeyi kaçırır. Bu yüzden eşik ölçülür:
+  //   1) ambient: ilk 1 sn bantların gürültü tabanı, sonraki 1.2 sn gürültünün dalgalanması
+  //   2) test:    deneme üflemesi (alevler eğilir ama sönmez); en yüksek seviyesi kaydedilir
+  //   3) live:    eşik = gürültü dalgalanması ile deneme üflemesi arasında
+  // Gürültü tabanı her bant için son 4 sn'nin alt çeyreğidir (25. yüzdelik): kalıcı
+  // gürültü artışları birkaç saniyede "normal" sayılır, birkaç saniyelik üfleme tabanı yükseltemez.
+  const HIST_STEP = .1, HIST_LEN = 40, SUS = 300;
+  let hist = [], histT = 0, blowOn = 0, blowGap = 0, susBuf = [], ambSus = [];
+  let phase = 'ambient', phaseT = 0, noiseMax = 0, need = 10, testOn = 0, testPeak = 0, testTilt = 0, requireTilt = true;
+
+  function resetDetect(keepCalibration) {
+    floor = null; calibSum = new Array(bands.length).fill(0); calibN = 0;
+    hist = []; histT = 0; blowOn = 0; susBuf = []; ambSus = []; phaseT = 0;
+    if (!keepCalibration) { phase = 'ambient'; noiseMax = 0; testOn = 0; testPeak = 0; testTilt = 0; requireTilt = true; }
+    $('#skipBtn').classList.add('hidden');
+    $('#recalBtn').classList.toggle('hidden', !keepCalibration);
+  }
+  function goLive(msg) {
+    phase = 'live';
+    $('#hint').textContent = msg;
+    $('#skipBtn').classList.add('hidden');
+    $('#recalBtn').classList.remove('hidden');
+  }
   function updateFloor() {
     if (hist.length < 8) return;
     floor = floor.map((f, i) => {
@@ -300,32 +315,79 @@
       return col[Math.floor(col.length * .25)];
     });
   }
+
+  // Dönüş: strength = mumları söndüren güç (0–1), visual = sadece alevin eğilmesi, meter = ölçer
   function blowDetect(now, dt) {
     const lv = bandLevels();
+    const none = { strength: 0, visual: 0, meter: 0 };
+    phaseT += dt;
     histT += dt;
     if (histT >= HIST_STEP) { histT = 0; hist.push(lv); if (hist.length > HIST_LEN) hist.shift(); }
-    if (now < calibUntil || !floor) {
+    if (!floor) {
       lv.forEach((v, i) => calibSum[i] += v); calibN++;
-      if (now >= calibUntil) {
+      if (phaseT >= 1) {
         floor = calibSum.map(v => v / calibN);
-        $('#hint').textContent = 'Hazır! Şimdi mumları üfle! 🌬️';
+        if (phase === 'live') $('#hint').textContent = 'Mumları üfle! 🌬️';
       }
-      return { strength: 0, meter: 0 };
+      return none;
     }
     if (histT === 0) updateFloor();
     lv.forEach((v, i) => { if (v < floor[i]) floor[i] = v; });       // gürültü azalınca hemen uyum
 
-    const need = SENS_DB[sens];
-    const ex = lv.map((v, i) => v - floor[i]);
-    const mean = ex.reduce((a, b) => a + b, 0) / ex.length;
-    const wide = ex.filter(e => e > need * .6).length / ex.length;   // geniş bantlı mı?
-    const cond = mean > need && wide >= .7 && flatness > .55;
+    // En çok yükselen 5 bandın ortalaması (dB): üfleme her bandı değil, alçak-orta bantları kaldırır
+    // Eğim: alçak bantların (100–450 Hz) yüksek bantlara (450–2000 Hz) göre ne kadar fazla
+    // yükseldiği. Mikrofondaki rüzgâr (üfleme) alçak frekansları çok daha fazla kaldırır;
+    // hızlanma, cam açma, pürüzlü yol gibi gürültü artışları ise tüm bantları birlikte yükseltir.
+    const exAll = lv.map((v, i) => v - floor[i]);
+    const tilt = exAll.slice(0, 6).reduce((a, b) => a + b, 0) / 6 - exAll.slice(6).reduce((a, b) => a + b, 0) / 6;
+    const ex = exAll.slice().sort((a, b) => b - a).slice(0, 5);
+    const level = ex.reduce((a, b) => a + b, 0) / ex.length;
+    // 0.3 sn boyunca kesintisiz aşılan seviye: tümsek gibi kısa patlamaları yok sayar
+    susBuf.push([now, level]);
+    while (now - susBuf[0][0] > SUS) susBuf.shift();
+    const sus = Math.min(...susBuf.map(x => x[1]));
+    const hiss = flatness > .55;      // hışırtı: konuşma/müzik değil
+    const lowHeavy = tilt > 3.5;      // alçak frekans ağırlıklı (mikrofonda rüzgâr)
 
-    // Tümsek/çukur gibi kısa patlamaları ele: en az 0.25 sn kesintisiz sürmeli
+    if (phase === 'ambient') {
+      ambSus.push(sus);
+      if (phaseT >= 2.2) {
+        // Gürültünün olağan üst sınırı (90. yüzdelik): erken başlayan bir üfleme ya da tek bir tümsek sayılmaz
+        const srt = ambSus.slice().sort((a, b) => a - b);
+        noiseMax = srt[Math.floor(srt.length * .9)] || 0;
+        phase = 'test'; phaseT = 0;
+        $('#hint').textContent = 'Önce bir deneme üfle 🌬️ (mumlar sönmez)';
+        $('#skipBtn').classList.remove('hidden');
+      }
+      return none;
+    }
+
+    if (phase === 'test') {
+      const gate = Math.max(noiseMax + 3, 6);
+      const meter = clamp(level / (gate * 1.6), 0, 1);
+      // Çoğu telefonda üfleme alçak frekans ağırlıklıdır; değilse ancak çok güçlüyse kabul et
+      if (sus > gate && hiss && (lowHeavy || sus > noiseMax + 10)) {
+        testOn += dt; testPeak = Math.max(testPeak, sus);
+        if (lowHeavy) testTilt += dt;
+        return { strength: 0, visual: clamp((level - gate) / 10 + .4, .4, 1), meter };
+      }
+      if (testOn > .35) {
+        need = clamp(Math.max(noiseMax + 3, testPeak * .5), 6, 40);
+        // Bu telefonda üfleme alçak frekans ağırlıklıysa sonraki üflemelerde de bunu ara
+        requireTilt = testTilt / testOn > .5;
+        goLive('Süper! Şimdi dileğini tut ve üfle! 🎂');
+        return { strength: 0, visual: 0, meter };
+      }
+      testOn = 0; testTilt = 0;
+      if (phaseT > 7) $('#hint').textContent = 'Telefona daha yakından ve güçlü üfle 💨';
+      return { strength: 0, visual: 0, meter };
+    }
+
+    const cond = level > need && hiss && (lowHeavy || !requireTilt);
     if (cond) { blowOn += dt; blowGap = 0; }
     else { blowGap += dt; if (blowGap > .12) blowOn = 0; }
-    const strength = cond && blowOn > .25 ? clamp((mean - need) / 12 + .3, .3, 1) : 0;
-    return { strength, meter: clamp(mean / (need * 1.6), 0, 1) };
+    const strength = cond && blowOn > .25 ? clamp((level - need) / (need * .6) + .35, .35, 1) : 0;
+    return { strength, visual: strength, meter: clamp(level / (need * 1.6), 0, 1) };
   }
 
   function micLevel() {
@@ -342,17 +404,18 @@
     lastT = now;
 
     if (state === 'blowing') {
-      let strength = 0;
+      let strength = 0, visual = 0;
 
       if (analyser) {
         const r = blowDetect(now, dt);
-        strength = r.strength;
+        strength = r.strength; visual = r.visual;
         $('#meter > div').style.width = r.meter * 100 + '%';
       }
 
       tapBoost = Math.max(0, tapBoost - dt * 2.2);
       strength = Math.max(strength, tapBoost);
-      smooth += (strength - smooth) * Math.min(1, dt * 12);
+      visual = Math.max(visual, strength);
+      smooth += (visual - smooth) * Math.min(1, dt * 12);
 
       let alive = 0;
       candles.forEach((c, i) => {
@@ -607,14 +670,19 @@
     }
   }
 
-  // Hassasiyet seçici
-  const sensBtns = document.querySelectorAll('#sens button');
-  function showSens() { sensBtns.forEach(b => b.classList.toggle('on', +b.dataset.s === sens)); }
-  sensBtns.forEach(b => b.addEventListener('click', () => {
-    sens = +b.dataset.s; showSens();
-    try { localStorage.setItem('mum-hassasiyet', sens); } catch (e) {}
-  }));
-  showSens();
+  // Deneme üflemesini atla: gürültü dalgalanmasının biraz üstünü eşik al
+  $('#skipBtn').addEventListener('click', () => {
+    if (phase !== 'test') return;
+    need = Math.max(noiseMax + 5, 8);
+    goLive('Mumları üfle! 🌬️');
+  });
+  // Ortam değiştiyse (arabaya binildi vb.) ölçümü baştan yap
+  $('#recalBtn').addEventListener('click', () => {
+    if (state !== 'blowing' || !analyser) return;
+    candles.forEach(c => { if (!c.out) c.health = 1; });
+    resetDetect(false);
+    $('#hint').textContent = 'Ortam sesi ölçülüyor… 👂';
+  });
 
   $('#startBtn').addEventListener('click', async () => {
     personName = $('#nameIn').value.trim();
