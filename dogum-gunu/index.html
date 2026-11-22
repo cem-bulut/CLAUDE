@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0820">
+<title>Doğum Günü Mumu</title>
+<style>
+  :root { --bg1:#22145a; --bg2:#05030f; --text:#fff7e6; --muted:#c9bfe6; --accent:#ffcf5a; --pink:#ff7eb6; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body {
+    background:radial-gradient(ellipse at 50% 25%, var(--bg1), var(--bg2) 72%);
+    color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    overflow:hidden; touch-action:manipulation; -webkit-user-select:none; user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #stars, #fx { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; }
+  #stars { z-index:0; }
+  #fx { z-index:1; }
+  .star { position:absolute; width:2px; height:2px; border-radius:50%; background:#fff; animation:twinkle var(--d) ease-in-out infinite alternate; }
+  @keyframes twinkle { from { opacity:.15 } to { opacity:.9 } }
+
+  #app {
+    position:relative; z-index:2; height:100%; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:14px; padding:max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    text-align:center;
+  }
+  h1 {
+    font-size:clamp(26px, 8vw, 44px); line-height:1.1; font-weight:800; letter-spacing:.5px;
+    background:linear-gradient(90deg, #ffd86b, #ff7eb6, #9b8cff, #6fe3ff, #ffd86b); background-size:300% 100%;
+    -webkit-background-clip:text; background-clip:text; color:transparent; animation:shine 4s linear infinite;
+    min-height:1.1em; opacity:0; transform:scale(.6); transition:opacity .6s, transform .6s cubic-bezier(.2,1.6,.4,1);
+  }
+  h1.show { opacity:1; transform:scale(1); }
+  @keyframes shine { to { background-position:300% 0; } }
+  #hint { font-size:18px; color:var(--muted); min-height:1.4em; }
+
+  #meter { width:min(70vw, 260px); height:8px; border-radius:8px; background:rgba(255,255,255,.12); overflow:hidden; }
+  #meter > div { height:100%; width:0%; background:linear-gradient(90deg, #6fe3ff, #9b8cff, #ff7eb6); border-radius:8px; transition:width .08s linear; }
+  #meter.hidden { visibility:hidden; }
+
+  /* ---------- Pasta ---------- */
+  .cake { position:relative; width:min(78vw, 320px); margin-top:90px; cursor:pointer; }
+  .plate { position:absolute; left:-8%; right:-8%; bottom:-14px; height:28px; border-radius:50%;
+    background:radial-gradient(ellipse at 50% 35%, #f4f1ff, #a9a3c9 70%); box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  .tier { position:relative; margin:0 auto; border-radius:0 0 22px 22px / 0 0 16px 16px; }
+  .tier::before { content:""; position:absolute; left:0; right:0; top:-15px; height:30px; border-radius:50%; background:var(--top); z-index:1; }
+  .tier::after { content:""; position:absolute; left:0; right:0; top:0; height:24px; z-index:1;
+    background:radial-gradient(circle at 12px 0, var(--top) 11px, transparent 12px) repeat-x; background-size:24px 24px; }
+  .tier.top { width:72%; height:78px; --top:#fff3fa;
+    background:
+      radial-gradient(circle at 20% 60%, #ffd86b 2px, transparent 3px),
+      radial-gradient(circle at 70% 40%, #6fe3ff 2px, transparent 3px),
+      radial-gradient(circle at 45% 75%, #9bff9b 2px, transparent 3px),
+      radial-gradient(circle at 85% 70%, #ff7eb6 2px, transparent 3px),
+      linear-gradient(90deg, #d9558f, #ff8cc0 45%, #d9558f);
+    background-size:60px 50px, 70px 46px, 54px 52px, 66px 44px, 100% 100%; }
+  .tier.bottom { width:100%; height:100px; margin-top:-2px; --top:#fff7e0;
+    background:
+      radial-gradient(circle at 30% 50%, #ff7eb6 2px, transparent 3px),
+      radial-gradient(circle at 75% 65%, #6fe3ff 2px, transparent 3px),
+      radial-gradient(circle at 55% 30%, #ffd86b 2px, transparent 3px),
+      linear-gradient(90deg, #7a4a2b, #b9784a 45%, #7a4a2b);
+    background-size:64px 48px, 58px 54px, 72px 50px, 100% 100%;
+    display:flex; align-items:flex-end; justify-content:center; padding-bottom:14px; }
+  .age-label { position:relative; z-index:2; font-weight:800; font-size:22px; color:#fff3c4; text-shadow:0 2px 0 #6a3b1f; }
+
+  .candles { position:absolute; left:0; right:0; bottom:calc(100% - 6px); display:flex; justify-content:center; align-items:flex-end; gap:var(--gap, 14px); z-index:3; }
+  .candle { position:relative; width:12px; height:62px; border-radius:3px 3px 2px 2px;
+    background:repeating-linear-gradient(135deg, var(--c1) 0 7px, #fff 7px 12px); box-shadow:inset -3px 0 4px rgba(0,0,0,.18); }
+  .candle:nth-child(odd) { height:56px; }
+  .wick { position:absolute; left:50%; bottom:100%; width:2px; height:8px; margin-left:-1px; background:#3a2a20; border-radius:1px; }
+  .flame-wrap { position:absolute; left:50%; bottom:calc(100% + 5px); width:0; height:0; transition:opacity .25s; }
+  .flame {
+    position:absolute; left:-9px; bottom:0; width:18px; height:34px; transform-origin:50% 100%;
+    transform:rotate(var(--lean, 0deg)) scale(var(--sx, 1), var(--sy, 1));
+  }
+  .flame i {
+    position:absolute; inset:0; border-radius:50% 50% 50% 50% / 62% 62% 38% 38%;
+    background:radial-gradient(ellipse at 50% 78%, #fff 0 14%, #fff2a8 26%, #ffb22e 52%, rgba(255,90,0,.85) 66%, rgba(255,60,0,0) 76%);
+    animation:flicker .12s ease-in-out infinite alternate; transform-origin:50% 100%;
+    filter:drop-shadow(0 0 6px rgba(255,170,40,.9));
+  }
+  .flame i::after { content:""; position:absolute; left:30%; right:30%; bottom:6%; height:30%; border-radius:50%; background:rgba(90,140,255,.55); filter:blur(2px); }
+  .glow { position:absolute; left:-45px; bottom:-30px; width:90px; height:90px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,190,80,.35), rgba(255,150,40,0) 65%); pointer-events:none; }
+  @keyframes flicker { from { transform:scale(1,1) skewX(-2deg); } to { transform:scale(.94,1.06) skewX(2deg); } }
+  .candle.out .flame-wrap { opacity:0; }
+  .smoke { position:absolute; left:50%; bottom:calc(100% + 6px); width:10px; height:10px; margin-left:-5px; border-radius:50%;
+    background:rgba(210,210,230,.55); filter:blur(3px); animation:smoke 2.2s ease-out forwards; pointer-events:none; }
+  @keyframes smoke {
+    from { transform:translate(0,0) scale(.6); opacity:.8; }
+    to   { transform:translate(var(--dx), -110px) scale(3.2); opacity:0; }
+  }
+
+  /* ---------- Şarkı sözleri ---------- */
+  #lyrics { min-height:150px; display:flex; flex-direction:column; gap:6px; margin-top:18px; }
+  #lyrics p { font-size:clamp(18px, 5.4vw, 26px); font-weight:700; color:rgba(255,255,255,.28); transition:color .25s, transform .25s; }
+  #lyrics p.on { color:var(--accent); transform:scale(1.08); text-shadow:0 0 18px rgba(255,207,90,.6); }
+  #lyrics p.done { color:rgba(255,255,255,.7); }
+
+  .controls { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; min-height:48px; }
+  button {
+    font:inherit; font-weight:700; font-size:17px; color:#1b1035; background:linear-gradient(180deg, #ffe08a, #ffb84d);
+    border:0; border-radius:999px; padding:12px 22px; box-shadow:0 6px 20px rgba(255,180,60,.35); cursor:pointer;
+  }
+  button.ghost { background:rgba(255,255,255,.12); color:var(--text); box-shadow:none; }
+  button:active { transform:translateY(1px) scale(.98); }
+  .hidden { display:none !important; }
+
+  /* ---------- Başlangıç kartı ---------- */
+  #setup { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(5,3,15,.6); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  .card { width:min(100%, 380px); background:linear-gradient(180deg, #2a1d63, #191040); border:1px solid rgba(255,255,255,.12); border-radius:24px; padding:26px 22px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  .card h2 { font-size:26px; margin-bottom:6px; }
+  .card p { color:var(--muted); font-size:15px; margin-bottom:18px; line-height:1.4; }
+  .card label { display:block; text-align:left; font-size:14px; color:var(--muted); margin:10px 0 6px; }
+  .card input { width:100%; font:inherit; font-size:18px; padding:12px 14px; border-radius:14px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); color:var(--text); outline:none; -webkit-user-select:text; user-select:text; }
+  .card input:focus { border-color:var(--accent); }
+  .card button { width:100%; margin-top:20px; font-size:19px; padding:14px; }
+  .note { font-size:12.5px !important; margin:14px 0 0 !important; }
+</style>
+</head>
+<body>
+<div id="stars"></div>
+<canvas id="fx"></canvas>
+
+<div id="setup">
+  <div class="card">
+    <h2>🎂 Doğum Günü Mumu</h2>
+    <p>Pastayı hazırla, telefonun mikrofonuna üfle ve mumları söndür!</p>
+    <label for="nameIn">Doğum günü olan kişi</label>
+    <input id="nameIn" type="text" maxlength="24" placeholder="İsim (ör. Ayşe)" autocomplete="off">
+    <label for="ageIn">Kaç yaşına giriyor?</label>
+    <input id="ageIn" type="number" inputmode="numeric" min="1" max="120" placeholder="ör. 5">
+    <button id="startBtn">Mumları yak 🕯️</button>
+    <p class="note">Mikrofon izni istenecek. İzin vermezsen mumlara dokunarak da üfleyebilirsin. Sesi duymak için telefonun sessiz modda olmadığından emin ol.</p>
+  </div>
+</div>
+
+<div id="app">
+  <h1 id="title">İyi ki doğdun!</h1>
+  <div id="hint">Mumları üfle! 🌬️</div>
+  <div id="meter" class="hidden"><div></div></div>
+
+  <div class="cake" id="cake">
+    <div class="plate"></div>
+    <div class="tier top"><div class="candles" id="candles"></div></div>
+    <div class="tier bottom"><span class="age-label" id="ageLabel"></span></div>
+  </div>
+
+  <div id="lyrics"></div>
+  <div class="controls">
+    <button id="againBtn" class="hidden">🎵 Tekrar söyle</button>
+    <button id="relightBtn" class="ghost hidden">🕯️ Yeniden yak</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------- Yıldızlar ----------
+  const starBox = $('#stars');
+  for (let i = 0; i < 70; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.style.left = rand(0, 100) + '%';
+    s.style.top = rand(0, 70) + '%';
+    s.style.setProperty('--d', rand(1.2, 3.5) + 's');
+    s.style.animationDelay = rand(0, 3) + 's';
+    if (Math.random() < .2) { s.style.width = s.style.height = '3px'; }
+    starBox.appendChild(s);
+  }
+
+  // ---------- Durum ----------
+  let audioCtx = null, master = null;
+  let analyser = null, micStream = null, timeData = null;
+  let state = 'setup';            // setup | blowing | party
+  let personName = '', age = 0;
+  let candles = [];
+  let threshold = 0.08, calibSamples = [], calibUntil = 0;
+  let smooth = 0, tapBoost = 0, lastT = performance.now();
+
+  const CANDLE_COLORS = ['#ff7eb6', '#6fe3ff', '#ffd86b', '#9bff9b', '#b59bff', '#ff9d6b'];
+
+  function buildCandles(n) {
+    const box = $('#candles');
+    box.innerHTML = '';
+    box.style.setProperty('--gap', (n > 7 ? 6 : n > 4 ? 10 : 16) + 'px');
+    candles = [];
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('div');
+      el.className = 'candle';
+      el.style.setProperty('--c1', CANDLE_COLORS[i % CANDLE_COLORS.length]);
+      el.innerHTML = '<div class="wick"></div><div class="flame-wrap"><div class="glow"></div><div class="flame"><i></i></div></div>';
+      box.appendChild(el);
+      candles.push({ el, flame: el.querySelector('.flame'), health: 1, res: rand(.75, 1.35), out: false, phase: rand(0, 6) });
+    }
+  }
+
+  // ---------- Ses ----------
+  function ensureAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const comp = audioCtx.createDynamicsCompressor();
+      master = audioCtx.createGain();
+      master.gain.value = .9;
+      master.connect(comp).connect(audioCtx.destination);
+    }
+    return audioCtx.resume();
+  }
+
+  async function startMic() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+      const src = audioCtx.createMediaStreamSource(micStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+      timeData = new Float32Array(analyser.fftSize);
+      calibSamples = [];
+      calibUntil = performance.now() + 1000;   // ilk 1 sn ortam gürültüsünü ölç
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function stopMic() {
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    micStream = null; analyser = null;
+  }
+
+  function micLevel() {
+    if (!analyser) return 0;
+    analyser.getFloatTimeDomainData(timeData);
+    let sum = 0;
+    for (let i = 0; i < timeData.length; i++) sum += timeData[i] * timeData[i];
+    return Math.sqrt(sum / timeData.length);
+  }
+
+  // ---------- Üfleme döngüsü ----------
+  function tick(now) {
+    const dt = Math.min(.05, (now - lastT) / 1000);
+    lastT = now;
+
+    if (state === 'blowing') {
+      const rms = micLevel();
+      let strength = 0;
+
+      if (analyser) {
+        if (now < calibUntil) {
+          calibSamples.push(rms);
+        } else if (calibSamples.length) {
+          const amb = calibSamples.reduce((a, b) => a + b, 0) / calibSamples.length;
+          threshold = clamp(amb * 4, .08, .3);
+          calibSamples = [];
+          $('#hint').textContent = 'Hazır! Şimdi mumları üfle! 🌬️';
+        }
+        if (now >= calibUntil && rms > threshold) strength = clamp((rms - threshold) / (threshold * 2), .15, 1);
+        $('#meter > div').style.width = clamp(rms / (threshold * 3), 0, 1) * 100 + '%';
+      }
+
+      tapBoost = Math.max(0, tapBoost - dt * 2.2);
+      strength = Math.max(strength, tapBoost);
+      smooth += (strength - smooth) * Math.min(1, dt * 12);
+
+      let alive = 0;
+      candles.forEach((c, i) => {
+        if (c.out) return;
+        if (strength > 0) c.health -= dt * strength * 1.7 / c.res;
+        else c.health = Math.min(1, c.health + dt * .4);   // rüzgâr kesilince alev toparlanır
+        const wob = Math.sin(now / 90 + c.phase) * smooth;
+        const lean = smooth * 38 + wob * 12;
+        const sy = clamp(1 - smooth * .55 + wob * .1, .3, 1.15) * (.55 + .45 * c.health);
+        c.flame.style.setProperty('--lean', lean + 'deg');
+        c.flame.style.setProperty('--sy', sy);
+        c.flame.style.setProperty('--sx', 1 - smooth * .25);
+        if (c.health <= 0) extinguish(c); else alive++;
+      });
+      if (alive === 0) allOut();
+    }
+
+    stepFireworks(dt);
+    requestAnimationFrame(tick);
+  }
+
+  function extinguish(c) {
+    c.out = true;
+    c.el.classList.add('out');
+    if (navigator.vibrate) navigator.vibrate(25);
+    for (let k = 0; k < 5; k++) {
+      const s = document.createElement('div');
+      s.className = 'smoke';
+      s.style.setProperty('--dx', rand(-25, 25) + 'px');
+      s.style.animationDelay = (k * .12) + 's';
+      c.el.appendChild(s);
+      setTimeout(() => s.remove(), 2600 + k * 120);
+    }
+  }
+
+  function allOut() {
+    state = 'party';
+    stopMic();
+    $('#meter').classList.add('hidden');
+    $('#hint').textContent = 'Dileğini tuttun mu? ✨';
+    setTimeout(celebrate, 700);
+  }
+
+  // Dokunarak üfleme (mikrofon yoksa ya da masaüstünde)
+  $('#cake').addEventListener('pointerdown', () => {
+    if (state === 'blowing') tapBoost = Math.min(1, tapBoost + .55);
+  });
+
+  // ---------- Havai fişekler ----------
+  const cv = $('#fx'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener('resize', resize); resize();
+
+  const G = 420;
+  let rockets = [], sparks = [];
+  let showUntil = 0, nextLaunch = 0;
+
+  function launch() {
+    const h = H * rand(.45, .8);
+    rockets.push({ x: rand(W * .12, W * .88), y: H + 10, vx: rand(-40, 40), vy: -Math.sqrt(2 * G * h), hue: rand(0, 360) });
+    whistle();
+  }
+
+  function explode(r) {
+    const type = Math.random();
+    const scale = Math.min(W, H) / 600 + .4;
+    const n = type < .2 ? 70 : Math.floor(rand(80, 130));
+    const hue2 = (r.hue + rand(60, 180)) % 360;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      let sp;
+      if (type < .25) sp = 210;                          // halka
+      else sp = Math.sqrt(Math.random()) * 240;          // küre
+      sp *= scale;
+      const willow = type > .85;
+      sparks.push({
+        x: r.x, y: r.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0, max: willow ? rand(2.2, 3) : rand(1.1, 1.8),
+        hue: willow ? 45 : (Math.random() < .5 ? r.hue : hue2),
+        light: willow ? 70 : 62, size: rand(1.4, 2.6), drag: willow ? .55 : .25
+      });
+    }
+    boom();
+  }
+
+  function stepFireworks(dt) {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+
+    const now = performance.now();
+    if (state === 'party' && now >= nextLaunch) {
+      const busy = now < showUntil;
+      const count = busy && Math.random() < .3 ? 3 : 1;
+      for (let i = 0; i < count; i++) launch();
+      nextLaunch = now + (busy ? rand(350, 750) : rand(1600, 3200));
+    }
+
+    for (let i = rockets.length - 1; i >= 0; i--) {
+      const r = rockets[i];
+      r.x += r.vx * dt; r.y += r.vy * dt; r.vy += G * dt;
+      ctx.fillStyle = `hsl(${r.hue},100%,75%)`;
+      ctx.beginPath(); ctx.arc(r.x, r.y, 2.4, 0, 7); ctx.fill();
+      // kıvılcım kuyruğu
+      ctx.fillStyle = 'rgba(255,200,120,.6)';
+      ctx.beginPath(); ctx.arc(r.x + rand(-2, 2), r.y + rand(4, 12), 1.2, 0, 7); ctx.fill();
+      if (r.vy >= -20) { explode(r); rockets.splice(i, 1); }
+    }
+
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i];
+      p.life += dt;
+      if (p.life >= p.max) { sparks.splice(i, 1); continue; }
+      const k = Math.pow(p.drag, dt);
+      p.vx *= k; p.vy *= k;
+      p.vy += G * .3 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      const t = p.life / p.max;
+      const alpha = (1 - t) * (t > .7 && Math.random() < .3 ? .3 : 1);  // sonda pırıltı
+      ctx.fillStyle = `hsla(${p.hue},100%,${p.light}%,${alpha})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (1 - t * .5), 0, 7); ctx.fill();
+    }
+  }
+
+  // Fişek sesleri
+  let noiseBuf = null;
+  function noise() {
+    if (!noiseBuf) {
+      noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 1.5, audioCtx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const s = audioCtx.createBufferSource(); s.buffer = noiseBuf; return s;
+  }
+  function boom() {
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const src = noise();
+    const f = audioCtx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(rand(700, 1400), t); f.frequency.exponentialRampToValueAtTime(80, t + 1.2);
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.35, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + 1.3);
+    src.connect(f).connect(g).connect(master); src.start(t); src.stop(t + 1.4);
+  }
+  function whistle() {
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(rand(900, 1300), t); o.frequency.exponentialRampToValueAtTime(rand(2000, 2800), t + .9);
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.025, t + .1); g.gain.exponentialRampToValueAtTime(.0001, t + .95);
+    o.connect(g).connect(master); o.start(t); o.stop(t + 1);
+  }
+
+  // ---------- İyi ki doğdun şarkısı ----------
+  const F = { F2: 87.31, G2: 98, A2: 110, B2: 123.47, C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196,
+              G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99 };
+  const MELODY = [
+    [['G4', .75], ['G4', .25], ['A4', 1], ['G4', 1], ['C5', 1], ['B4', 2]],
+    [['G4', .75], ['G4', .25], ['A4', 1], ['G4', 1], ['D5', 1], ['C5', 2]],
+    [['G4', .75], ['G4', .25], ['G5', 1], ['E5', 1], ['C5', 1], ['B4', 1], ['A4', 2]],
+    [['F5', .75], ['F5', .25], ['E5', 1], ['C5', 1], ['D5', 1], ['C5', 3]],
+  ];
+  // [başlangıç vuruşu, notalar, süre]
+  const CHORDS = [
+    [1, ['C3', 'E3', 'G3'], 3], [4, ['G2', 'B2', 'D3', 'F3'], 3],
+    [7, ['G2', 'B2', 'D3', 'F3'], 3], [10, ['C3', 'E3', 'G3'], 3],
+    [13, ['C3', 'E3', 'G3'], 3], [16, ['F2', 'A2', 'C3', 'F3'], 3],
+    [20, ['C3', 'E3', 'G3'], 2], [22, ['G2', 'B2', 'D3', 'F3'], 1], [23, ['C3', 'E3', 'G3'], 3],
+  ];
+  const BEAT = .52;
+  let songTimers = [];
+
+  function tone(freq, t, dur, type, vol) {
+    const o = audioCtx.createOscillator(); o.type = type; o.frequency.value = freq;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + .025);
+    g.gain.exponentialRampToValueAtTime(vol * .6, t + .15);
+    g.gain.setValueAtTime(vol * .6, t + Math.max(.16, dur - .08));
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g).connect(master); o.start(t); o.stop(t + dur + .02);
+  }
+
+  function lyricLines() {
+    const n = personName || 'canım';
+    return ['İyi ki doğdun 🎈', 'İyi ki doğdun 🎁', `İyi ki doğdun ${n} 💖`, 'İyi ki doğdun! 🎂'];
+  }
+
+  function sing() {
+    songTimers.forEach(clearTimeout); songTimers = [];
+    const box = $('#lyrics');
+    box.innerHTML = lyricLines().map(l => `<p>${l.replace(/</g, '&lt;')}</p>`).join('');
+    const ps = box.querySelectorAll('p');
+    $('#againBtn').classList.add('hidden');
+
+    const start = audioCtx.currentTime + .3;
+    let beat = 0;
+    MELODY.forEach((line, li) => {
+      const lineStart = beat;
+      songTimers.push(setTimeout(() => {
+        ps.forEach((p, j) => { p.classList.toggle('on', j === li); p.classList.toggle('done', j < li); });
+      }, (lineStart * BEAT + .3) * 1000));
+      line.forEach(([n, b]) => {
+        const t = start + beat * BEAT, d = b * BEAT * .95;
+        tone(F[n], t, d, 'triangle', .28);
+        tone(F[n] * 2, t, d, 'sine', .05);
+        beat += b;
+      });
+    });
+    CHORDS.forEach(([b, notes, len]) => {
+      notes.forEach(n => tone(F[n], start + b * BEAT, len * BEAT * .98, 'sine', .06));
+    });
+    const end = (beat * BEAT + .6) * 1000;
+    songTimers.push(setTimeout(() => {
+      ps.forEach(p => { p.classList.remove('on'); p.classList.add('done'); });
+      $('#hint').textContent = `Nice mutlu yıllara${personName ? ', ' + personName : ''}! 🥳`;
+      $('#againBtn').classList.remove('hidden');
+    }, end));
+  }
+
+  function celebrate() {
+    $('#title').classList.add('show');
+    showUntil = performance.now() + 15000;
+    nextLaunch = 0;
+    for (let i = 0; i < 3; i++) setTimeout(launch, i * 180);
+    sing();
+    $('#relightBtn').classList.remove('hidden');
+  }
+
+  // ---------- Akış ----------
+  async function begin() {
+    state = 'blowing';
+    tapBoost = 0; smooth = 0;
+    buildCandles(clamp(age || 5, 1, 10));
+    $('#lyrics').innerHTML = '';
+    $('#title').classList.remove('show');
+    $('#againBtn').classList.add('hidden');
+    $('#relightBtn').classList.add('hidden');
+    songTimers.forEach(clearTimeout);
+    $('#hint').textContent = 'Mikrofon hazırlanıyor…';
+    const ok = await startMic();
+    if (ok) {
+      $('#meter').classList.remove('hidden');
+      $('#hint').textContent = 'Bir saniye sessiz kal… 🤫';
+    } else {
+      $('#hint').textContent = 'Mikrofon yok — mumlara dokunarak üfle! 👆';
+    }
+  }
+
+  $('#startBtn').addEventListener('click', async () => {
+    personName = $('#nameIn').value.trim();
+    age = parseInt($('#ageIn').value, 10) || 0;
+    $('#ageLabel').textContent = age ? `${age} yaş` : '';
+    $('#title').textContent = personName ? `İyi ki doğdun ${personName}!` : 'İyi ki doğdun!';
+    $('#setup').classList.add('hidden');
+    await ensureAudio();
+    begin();
+  });
+  $('#againBtn').addEventListener('click', () => { ensureAudio(); showUntil = performance.now() + 15000; sing(); });
+  $('#relightBtn').addEventListener('click', () => { ensureAudio(); begin(); });
+
+  buildCandles(5);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

@@ -40,3 +40,7 @@ Notlar:
 - Çevrimdışı çalışması için `three.min.js` dosyasını `prototype/` içine indirip `<script src>` yolunu yerel dosyaya çevirin.
 - Dikey ekranı sabitlemek için `android/app/src/main/AndroidManifest.xml` içindeki activity'ye `android:screenOrientation="portrait"` ekleyin.
 - Tam sürüm için GDD'de önerilen yol Godot 4'tür (bkz. GDD §10.1).
+
+## Doğum Günü Mumu
+
+**[dogum-gunu/index.html](dogum-gunu/index.html):** Telefonun mikrofonuna üfleyerek söndürülen doğum günü mumları. Mumlar sönünce havai fişekler patlar ve "İyi ki doğdun" şarkısı çalar. Mikrofon için sayfanın HTTPS üzerinden (ör. GitHub Pages) açılması gerekir.
