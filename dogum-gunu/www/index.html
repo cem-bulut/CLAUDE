@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0b0820">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mum">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Doğum Günü Mumu</title>
 <style>
   :root { --bg1:#22145a; --bg2:#05030f; --text:#fff7e6; --muted:#c9bfe6; --accent:#ffcf5a; --pink:#ff7eb6; }
@@ -535,6 +542,30 @@
   });
   $('#againBtn').addEventListener('click', () => { ensureAudio(); showUntil = performance.now() + 15000; sing(); });
   $('#relightBtn').addEventListener('click', () => { ensureAudio(); begin(); });
+
+  // ---------- Mobil uygulama ayarları ----------
+  // Mumlar yanarken ekran kararmasın
+  let wakeLock = null;
+  async function keepAwake() {
+    try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      keepAwake();
+      if (audioCtx) audioCtx.resume();
+      // Uygulama arka plandan dönünce mikrofon kapanmış olabilir
+      if (state === 'blowing' && (!micStream || micStream.getTracks().every(t => t.readyState === 'ended'))) {
+        stopMic(); if (audioCtx) startMic();
+      }
+    }
+  });
+  document.addEventListener('pointerdown', keepAwake, { once: true });
+
+  // Tarayıcıdan açıldığında çevrimdışı çalışma ve ana ekrana ekleme (yerel uygulamada gerekmez)
+  const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if (!isNative && 'serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 
   buildCandles(5);
   requestAnimationFrame(tick);

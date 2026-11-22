@@ -1,0 +1,48 @@
+name: Doğum Günü Mumu APK
+
+on:
+  push:
+    paths:
+      - 'dogum-gunu/**'
+      - '.github/workflows/dogum-gunu-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dogum-gunu
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dogum-gunu/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: Web dosyalarını Android projesine kopyala
+        run: npx cap sync android
+
+      - name: APK derle
+        working-directory: dogum-gunu/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dogum-gunu-mumu-apk
+          path: dogum-gunu/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

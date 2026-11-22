@@ -1,0 +1,8 @@
+{
+  "appId": "app.dogumgunu.mum",
+  "appName": "Doğum Günü Mumu",
+  "webDir": "www",
+  "backgroundColor": "#0b0820",
+  "android": { "backgroundColor": "#0b0820" },
+  "ios": { "backgroundColor": "#0b0820", "contentInset": "never" }
+}
