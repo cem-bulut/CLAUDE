@@ -43,9 +43,14 @@
   @keyframes shine { to { background-position:300% 0; } }
   #hint { font-size:18px; color:var(--muted); min-height:1.4em; }
 
-  #meter { width:min(70vw, 260px); height:8px; border-radius:8px; background:rgba(255,255,255,.12); overflow:hidden; }
+  #micBox { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  #micBox.hidden { visibility:hidden; }
+  #meter { position:relative; width:min(70vw, 260px); height:8px; border-radius:8px; background:rgba(255,255,255,.12); }
   #meter > div { height:100%; width:0%; background:linear-gradient(90deg, #6fe3ff, #9b8cff, #ff7eb6); border-radius:8px; transition:width .08s linear; }
-  #meter.hidden { visibility:hidden; }
+  #meter::after { content:""; position:absolute; left:62.5%; top:-4px; bottom:-4px; width:2px; border-radius:2px; background:rgba(255,255,255,.7); }
+  #sens { display:flex; align-items:center; gap:4px; font-size:13px; color:var(--muted); }
+  #sens button { font-size:13px; font-weight:600; padding:5px 10px; background:rgba(255,255,255,.1); color:var(--text); box-shadow:none; }
+  #sens button.on { background:linear-gradient(180deg, #ffe08a, #ffb84d); color:#1b1035; }
 
   /* ---------- Pasta ---------- */
   .cake { position:relative; width:min(78vw, 320px); margin-top:90px; cursor:pointer; }
@@ -148,7 +153,12 @@
 <div id="app">
   <h1 id="title">İyi ki doğdun!</h1>
   <div id="hint">Mumları üfle! 🌬️</div>
-  <div id="meter" class="hidden"><div></div></div>
+  <div id="micBox" class="hidden">
+    <div id="meter"><div></div></div>
+    <div id="sens">Hassasiyet:
+      <button data-s="0">Düşük</button><button data-s="1">Normal</button><button data-s="2">Yüksek</button>
+    </div>
+  </div>
 
   <div class="cake" id="cake">
     <div class="plate"></div>
@@ -184,11 +194,15 @@
 
   // ---------- Durum ----------
   let audioCtx = null, master = null;
-  let analyser = null, micStream = null, timeData = null;
+  let analyser = null, micStream = null, timeData = null, freqData = null, bands = [];
   let state = 'setup';            // setup | blowing | party
   let personName = '', age = 0;
   let candles = [];
-  let threshold = 0.08, calibSamples = [], calibUntil = 0;
+  let calibUntil = 0, calibSum = null, calibN = 0, floor = null;
+  // Üfleme, ortam gürültüsünün kaç dB üstünde olmalı (Düşük / Normal / Yüksek hassasiyet)
+  const SENS_DB = [15, 10, 6.5];
+  let sens = 1;
+  try { const v = parseInt(localStorage.getItem('mum-hassasiyet'), 10); if (v >= 0 && v <= 2) sens = v; } catch (e) {}
   let smooth = 0, tapBoost = 0, lastT = performance.now();
 
   const CANDLE_COLORS = ['#ff7eb6', '#6fe3ff', '#ffd86b', '#9bff9b', '#b59bff', '#ff9d6b'];
@@ -228,10 +242,21 @@
       });
       const src = audioCtx.createMediaStreamSource(micStream);
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 1024;
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = .3;
       src.connect(analyser);
       timeData = new Float32Array(analyser.fftSize);
-      calibSamples = [];
+      freqData = new Float32Array(analyser.frequencyBinCount);
+      // 250 Hz – 4 kHz arası 12 logaritmik bant. Araba/motor uğultusunun yoğun olduğu
+      // alçak frekanslar dışarıda kalır; üfleme ise bu aralığın tamamında güçlü ses üretir.
+      const hz = audioCtx.sampleRate / analyser.fftSize;
+      bands = [];
+      for (let i = 0; i < 12; i++) {
+        const lo = Math.floor(250 * Math.pow(16, i / 12) / hz);
+        const hi = Math.max(lo + 1, Math.floor(250 * Math.pow(16, (i + 1) / 12) / hz));
+        bands.push([lo, hi]);
+      }
+      floor = null; calibSum = new Array(bands.length).fill(0); calibN = 0;
       calibUntil = performance.now() + 1000;   // ilk 1 sn ortam gürültüsünü ölç
       return true;
     } catch (e) {
@@ -242,6 +267,52 @@
   function stopMic() {
     if (micStream) micStream.getTracks().forEach(t => t.stop());
     micStream = null; analyser = null;
+  }
+
+  // Her bandın ortalama gücü (dB)
+  // Her bandın ortalama gücü (dB) ve spektral düzlüğü. Üfleme hışırtı gibi düz bir
+  // spektrum üretir (düzlük ≈ 0.5); konuşma ve müzik harmonik tepeler içerir (düşük düzlük).
+  let flatness = 0;
+  function bandLevels() {
+    analyser.getFloatFrequencyData(freqData);
+    let fSum = 0, fW = 0;
+    const lv = bands.map(([lo, hi]) => {
+      let p = 0, lg = 0;
+      for (let k = lo; k < hi; k++) { const v = Math.pow(10, Math.max(-140, freqData[k]) / 10); p += v; lg += Math.log(v + 1e-20); }
+      const n = hi - lo, mean = p / n;
+      if (n >= 4) { fSum += Math.exp(lg / n) / (mean + 1e-20); fW++; }
+      return 10 * Math.log10(mean + 1e-14);
+    });
+    flatness = fW ? fSum / fW : 1;
+    return lv;
+  }
+
+  // Üfleme gücü (0–1) ve ölçer için oran. Ortam gürültüsü bant bant takip edilir:
+  // gürültü azalınca taban hemen iner, artınca (araba hızlanınca vb.) yavaşça yükselir.
+  function blowDetect(now, dt) {
+    const lv = bandLevels();
+    const rms = micLevel();
+    if (now < calibUntil || !floor) {
+      lv.forEach((v, i) => calibSum[i] += v); calibN++;
+      if (now >= calibUntil) {
+        floor = calibSum.map(v => v / calibN);
+        $('#hint').textContent = 'Hazır! Şimdi mumları üfle! 🌬️';
+      }
+      return { strength: 0, meter: 0 };
+    }
+    const need = SENS_DB[sens];
+    const ex = lv.map((v, i) => v - floor[i]);
+    const mean = ex.reduce((a, b) => a + b, 0) / ex.length;
+    const wide = ex.filter(e => e > need * .6).length / ex.length;   // geniş bantlı mı?
+    let strength = 0;
+    if (mean > need && wide >= .6 && flatness > .55) strength = clamp((mean - need) / 12 + .3, .3, 1);
+    if (rms > .6) strength = Math.max(strength, .8);                // mikrofon doyuma ulaştı
+    const quiet = mean < need * .5;
+    lv.forEach((v, i) => {
+      if (v < floor[i]) floor[i] += (v - floor[i]) * Math.min(1, dt * 3);
+      else if (quiet) floor[i] += Math.min(v - floor[i], dt * 4);  // en fazla 4 dB/sn yüksel
+    });
+    return { strength, meter: clamp(mean / (need * 1.6), 0, 1) };
   }
 
   function micLevel() {
@@ -258,20 +329,12 @@
     lastT = now;
 
     if (state === 'blowing') {
-      const rms = micLevel();
       let strength = 0;
 
       if (analyser) {
-        if (now < calibUntil) {
-          calibSamples.push(rms);
-        } else if (calibSamples.length) {
-          const amb = calibSamples.reduce((a, b) => a + b, 0) / calibSamples.length;
-          threshold = clamp(amb * 4, .08, .3);
-          calibSamples = [];
-          $('#hint').textContent = 'Hazır! Şimdi mumları üfle! 🌬️';
-        }
-        if (now >= calibUntil && rms > threshold) strength = clamp((rms - threshold) / (threshold * 2), .15, 1);
-        $('#meter > div').style.width = clamp(rms / (threshold * 3), 0, 1) * 100 + '%';
+        const r = blowDetect(now, dt);
+        strength = r.strength;
+        $('#meter > div').style.width = r.meter * 100 + '%';
       }
 
       tapBoost = Math.max(0, tapBoost - dt * 2.2);
@@ -315,7 +378,7 @@
   function allOut() {
     state = 'party';
     stopMic();
-    $('#meter').classList.add('hidden');
+    $('#micBox').classList.add('hidden');
     $('#hint').textContent = 'Dileğini tuttun mu? ✨';
     setTimeout(celebrate, 700);
   }
@@ -524,12 +587,21 @@
     $('#hint').textContent = 'Mikrofon hazırlanıyor…';
     const ok = await startMic();
     if (ok) {
-      $('#meter').classList.remove('hidden');
-      $('#hint').textContent = 'Bir saniye sessiz kal… 🤫';
+      $('#micBox').classList.remove('hidden');
+      $('#hint').textContent = 'Ortam sesi ölçülüyor… 👂';
     } else {
       $('#hint').textContent = 'Mikrofon yok — mumlara dokunarak üfle! 👆';
     }
   }
+
+  // Hassasiyet seçici
+  const sensBtns = document.querySelectorAll('#sens button');
+  function showSens() { sensBtns.forEach(b => b.classList.toggle('on', +b.dataset.s === sens)); }
+  sensBtns.forEach(b => b.addEventListener('click', () => {
+    sens = +b.dataset.s; showSens();
+    try { localStorage.setItem('mum-hassasiyet', sens); } catch (e) {}
+  }));
+  showSens();
 
   $('#startBtn').addEventListener('click', async () => {
     personName = $('#nameIn').value.trim();
