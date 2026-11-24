@@ -5,6 +5,7 @@ Düşen blokları yerleştirerek gezgin **Ada**'ya merdiven örüyorsun ve onu h
 
 - **[GDD.md](GDD.md):** Tam oyun tasarım belgesi (mekanikler, macera katmanı, kontroller, sanat, teknik plan, yol haritası).
 - **[prototype/index.html](prototype/index.html):** Oynanabilir 3B prototip (Three.js, tek dosya, dokunmatik kontroller).
+- **[kupdiyar/index.html](kupdiyar/index.html):** *Küpdiyar*, sonsuz voksel sandbox oyunu (kaz, inşa et, keşfet). Ayrıntılar aşağıda.
 
 ## Prototipi çalıştırma
 
@@ -40,3 +41,24 @@ Notlar:
 - Çevrimdışı çalışması için `three.min.js` dosyasını `prototype/` içine indirip `<script src>` yolunu yerel dosyaya çevirin.
 - Dikey ekranı sabitlemek için `android/app/src/main/AndroidManifest.xml` içindeki activity'ye `android:screenOrientation="portrait"` ekleyin.
 - Tam sürüm için GDD'de önerilen yol Godot 4'tür (bkz. GDD §10.1).
+
+## Küpdiyar (voksel sandbox)
+
+`kupdiyar/index.html` tek dosyadır ve masaüstünde de telefonda da çalışır.
+
+```bash
+cd kupdiyar && python3 -m http.server 8081
+```
+
+- Tohumdan üretilen sonsuz dünya: tepeler, dağlar, karlı zirveler, kumsallar, çöller, denizler, ormanlar, mağaralar ve cevherler.
+- 17 blok türü var. Tüm dokular kodla çizilir, dışarıdan görsel dosyası yüklenmez.
+- Blok kırma ve koyma, köşe gölgelendirmesi (AO), gölge altında kararma, gündüz/gece döngüsü, su altı görünümü, uçma modu.
+- Yaptığın değişiklikler ve konumun tarayıcıda (localStorage) tohum bazında saklanır.
+
+| Eylem | Klavye / fare | Dokunmatik |
+|---|---|---|
+| Yürü / bak | WASD + fare | Sol yarıda sürükle / sağ yarıda sürükle |
+| Zıpla / koş | Boşluk / Shift | Zıpla düğmesi / joystick'i sonuna kadar it |
+| Kır / koy | Sol tık / sağ tık | Basılı tut / dokun |
+| Blok seç | 1–9, tekerlek, orta tık, E | Alt çubuk, ▦ |
+| Uçma | F (Boşluk yukarı, Shift aşağı) | Uç düğmesi (Zıpla / İn) |

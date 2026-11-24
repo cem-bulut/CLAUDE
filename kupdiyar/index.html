@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0f1420">
+<title>Küpdiyar</title>
+<style>
+:root{--panel:rgba(12,16,28,.74);--line:rgba(255,255,255,.14);--accent:#ffcf4a;--text:#f3f5fa;--muted:#a9b1c6}
+html,body{margin:0;height:100%;overflow:hidden;background:#0f1420;color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none;
+  touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#game{display:block;position:fixed;inset:0;width:100vw;height:100vh}
+#cross{position:fixed;left:50%;top:50%;width:20px;height:20px;transform:translate(-50%,-50%);pointer-events:none;mix-blend-mode:difference}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff}
+#cross:before{left:9px;top:0;width:2px;height:20px}
+#cross:after{top:9px;left:0;height:2px;width:20px}
+#hotbar{position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:3px;
+  padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.slot{width:44px;height:44px;border-radius:7px;border:2px solid transparent;display:grid;place-items:center;position:relative;cursor:pointer;box-sizing:border-box}
+.slot.sel{border-color:var(--accent);background:rgba(255,255,255,.12)}
+.slot canvas{width:34px;height:34px;image-rendering:pixelated;pointer-events:none}
+.slot span{position:absolute;left:3px;top:0;font-size:10px;color:var(--muted);pointer-events:none}
+#blockname{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);font-size:14px;font-weight:600;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .4s;pointer-events:none;white-space:nowrap}
+#info{position:fixed;left:10px;top:max(10px,env(safe-area-inset-top));font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;text-shadow:0 1px 2px #000;white-space:pre;pointer-events:none}
+#underwater{position:fixed;inset:0;background:rgba(24,62,150,.45);pointer-events:none;display:none}
+#loading{position:fixed;left:50%;top:58%;transform:translateX(-50%);font-size:14px;color:var(--muted);text-shadow:0 1px 2px #000;pointer-events:none;display:none}
+.overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(6,8,16,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);padding:16px;box-sizing:border-box}
+.hidden{display:none!important}
+.card{background:var(--panel);border:1px solid var(--line);padding:22px;border-radius:16px;width:min(380px,100%);box-sizing:border-box;text-align:center;max-height:100%;overflow:auto}
+.card h1{margin:0;font-size:34px;letter-spacing:.5px}
+.card h1 b{color:var(--accent)}
+.card p.sub{margin:4px 0 18px;color:var(--muted);font-size:14px}
+.btn{display:block;width:100%;padding:12px;margin:8px 0;border:0;border-radius:10px;font:600 16px system-ui,sans-serif;cursor:pointer;background:#2a3350;color:var(--text)}
+.btn.primary{background:var(--accent);color:#1b1606}
+.btn:active{transform:translateY(1px)}
+.row{display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;color:var(--muted);text-align:left}
+.row input[type=text]{flex:1;min-width:0;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:#141a2c;color:var(--text);font:14px system-ui,sans-serif}
+.row input[type=range]{flex:1}
+.keys{font-size:12.5px;color:var(--muted);text-align:left;line-height:1.7;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.keys kbd{display:inline-block;min-width:16px;padding:0 5px;border:1px solid var(--line);border-radius:4px;background:#1a2136;color:var(--text);font:11px ui-monospace,monospace;text-align:center}
+#inv .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;margin:14px 0}
+#inv .grid .slot{width:auto;height:56px;background:rgba(255,255,255,.05)}
+#inv .grid .slot canvas{width:40px;height:40px}
+#touch{position:fixed;inset:0;pointer-events:none}
+.tbtn{position:fixed;pointer-events:auto;width:64px;height:64px;border-radius:50%;background:rgba(20,26,44,.55);border:1px solid var(--line);
+  color:var(--text);font:600 13px system-ui,sans-serif;display:grid;place-items:center;touch-action:none}
+.tbtn.on{background:rgba(255,207,74,.55);color:#1b1606}
+.tbtn.small{width:44px;height:44px;border-radius:12px;font-size:16px}
+#tJump{right:22px;bottom:96px}
+#tDown{right:96px;bottom:96px}
+#tFly{right:22px;bottom:172px;width:52px;height:52px}
+#tPause{right:max(10px,env(safe-area-inset-right));top:max(10px,env(safe-area-inset-top))}
+#tInv{right:calc(max(10px,env(safe-area-inset-right)) + 52px);top:max(10px,env(safe-area-inset-top))}
+#stick{position:fixed;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(20,26,44,.3);display:none;pointer-events:none}
+#knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(255,255,255,.55)}
+#hint{position:fixed;left:50%;top:max(14px,env(safe-area-inset-top));transform:translateX(-50%);font-size:12.5px;color:var(--text);background:var(--panel);padding:6px 12px;border-radius:999px;pointer-events:none;transition:opacity .8s;white-space:nowrap}
+@media (max-width:520px){
+  .slot{width:34px;height:34px}.slot canvas{width:26px;height:26px}.slot span{display:none}
+  #hotbar{gap:1px;padding:3px}#blockname{bottom:60px}
+  #tJump{bottom:80px}#tDown{bottom:80px}#tFly{bottom:154px}
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="underwater"></div>
+<div id="cross"></div>
+<div id="info"></div>
+<div id="loading">Dünya oluşturuluyor…</div>
+<div id="blockname"></div>
+<div id="hotbar"></div>
+<div id="hint" class="hidden"></div>
+
+<div id="touch" class="hidden">
+  <div id="stick"><div id="knob"></div></div>
+  <div class="tbtn" id="tJump">Zıpla</div>
+  <div class="tbtn hidden" id="tDown">İn</div>
+  <div class="tbtn" id="tFly">Uç</div>
+  <div class="tbtn small" id="tInv">▦</div>
+  <div class="tbtn small" id="tPause">❚❚</div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="card">
+    <h1>Küp<b>diyar</b></h1>
+    <p class="sub">Sonsuz bir küp dünyası. Kaz, keşfet, inşa et.</p>
+    <button class="btn primary" id="play">Oyna</button>
+    <div class="row"><span>Tohum</span><input type="text" id="seed" maxlength="32" spellcheck="false"></div>
+    <button class="btn" id="newWorld">Bu tohumla yeni dünya</button>
+    <div class="row"><span>Görüş</span><input type="range" id="dist" min="2" max="10" step="1"><span id="distVal"></span></div>
+    <div class="keys" id="keysDesk">
+      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> yürü · <kbd>Boşluk</kbd> zıpla · <kbd>Shift</kbd> koş<br>
+      <b>Sol tık</b> kır · <b>Sağ tık</b> koy · <b>Orta tık</b> bloğu seç<br>
+      <kbd>1</kbd>–<kbd>9</kbd> / tekerlek: blok · <kbd>E</kbd> tüm bloklar<br>
+      <kbd>F</kbd> uçma (Boşluk yukarı, Shift aşağı) · <kbd>F3</kbd> bilgi · <kbd>Esc</kbd> duraklat
+    </div>
+    <div class="keys hidden" id="keysTouch">
+      Sol yarı: sürükle ve yürü · Sağ yarı: sürükle ve bak<br>
+      <b>Dokun</b>: blok koy · <b>Basılı tut</b>: blok kır<br>
+      Alttaki çubuktan blok seç, ▦ ile tüm bloklar
+    </div>
+  </div>
+</div>
+
+<div id="inv" class="overlay hidden">
+  <div class="card">
+    <h1 style="font-size:22px">Bloklar</h1>
+    <p class="sub" style="margin-bottom:0">Seçili yuvaya koymak için bir bloğa dokun.</p>
+    <div class="grid" id="invGrid"></div>
+    <button class="btn" id="invClose">Kapat</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+// ---------------------------------------------------------------- sabitler
+const CS = 16, CH = 80, SEA = 24, CA = CS * CS;
+const isTouch = matchMedia('(pointer:coarse)').matches || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+const $ = id => document.getElementById(id);
+
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
+};
+
+// ---------------------------------------------------------------- rastgelelik ve gürültü
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function hashStr(s){ let h=2166136261; for (let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function hash3(x,y,z,s){ let h=s^Math.imul(x,374761393)^Math.imul(y,668265263)^Math.imul(z,2147483647); h=Math.imul(h^h>>>13,1274126177); h^=h>>>16; return (h>>>0)/4294967296; }
+
+class Perlin {
+  constructor(seed){
+    const r = mulberry32(seed), p = new Uint8Array(256);
+    for (let i=0;i<256;i++) p[i]=i;
+    for (let i=255;i>0;i--){ const j=Math.floor(r()*(i+1)); const t=p[i]; p[i]=p[j]; p[j]=t; }
+    this.p = new Uint8Array(512); for (let i=0;i<512;i++) this.p[i]=p[i&255];
+  }
+  static fade(t){ return t*t*t*(t*(t*6-15)+10); }
+  static g2(h,x,y){ switch(h&7){ case 0:return x+y; case 1:return -x+y; case 2:return x-y; case 3:return -x-y; case 4:return x; case 5:return -x; case 6:return y; default:return -y; } }
+  static g3(h,x,y,z){ const H=h&15, u=H<8?x:y, v=H<4?y:(H===12||H===14?x:z); return ((H&1)?-u:u)+((H&2)?-v:v); }
+  n2(x,y){
+    const p=this.p, fx=Math.floor(x), fy=Math.floor(y); x-=fx; y-=fy;
+    const X=fx&255, Y=fy&255, u=Perlin.fade(x), v=Perlin.fade(y), g=Perlin.g2;
+    const a=p[X]+Y, b=p[X+1]+Y;
+    const l1=g(p[a],x,y)+u*(g(p[b],x-1,y)-g(p[a],x,y));
+    const l2=g(p[a+1],x,y-1)+u*(g(p[b+1],x-1,y-1)-g(p[a+1],x,y-1));
+    return (l1+v*(l2-l1))*0.7;
+  }
+  n3(x,y,z){
+    const p=this.p, fx=Math.floor(x), fy=Math.floor(y), fz=Math.floor(z);
+    const X=fx&255, Y=fy&255, Z=fz&255; x-=fx; y-=fy; z-=fz;
+    const u=Perlin.fade(x), v=Perlin.fade(y), w=Perlin.fade(z), g=Perlin.g3, L=(t,a,b)=>a+t*(b-a);
+    const A=p[X]+Y, AA=p[A]+Z, AB=p[A+1]+Z, B=p[X+1]+Y, BA=p[B]+Z, BB=p[B+1]+Z;
+    return L(w, L(v, L(u,g(p[AA],x,y,z),g(p[BA],x-1,y,z)), L(u,g(p[AB],x,y-1,z),g(p[BB],x-1,y-1,z))),
+                L(v, L(u,g(p[AA+1],x,y,z-1),g(p[BA+1],x-1,y,z-1)), L(u,g(p[AB+1],x,y-1,z-1),g(p[BB+1],x-1,y-1,z-1))));
+  }
+  fbm2(x,y,o){ let s=0,a=1,f=1,n=0; for (let i=0;i<o;i++){ s+=a*this.n2(x*f,y*f); n+=a; a*=.5; f*=2; } return s/n; }
+}
+
+// ---------------------------------------------------------------- dokular (kod ile çizilen 16x16 atlas)
+const TILE = 16, ACOLS = 8, AROWS = 4;
+const atlas = document.createElement('canvas');
+atlas.width = TILE*ACOLS; atlas.height = TILE*AROWS;
+const actx2 = atlas.getContext('2d');
+const img = actx2.createImageData(atlas.width, atlas.height);
+const tileAvg = [];
+const cl = v => v<0?0:v>255?255:v|0;
+function paint(t, factory){
+  const r = mulberry32(9001+t*77), fn = factory(r);
+  const tx=(t%ACOLS)*TILE, ty=Math.floor(t/ACOLS)*TILE; let sr=0,sg=0,sb=0,n=0;
+  for (let y=0;y<TILE;y++) for (let x=0;x<TILE;x++){
+    const c = fn(x,y), i=((ty+y)*atlas.width+tx+x)*4, a = c[3]===undefined?255:c[3];
+    img.data[i]=cl(c[0]); img.data[i+1]=cl(c[1]); img.data[i+2]=cl(c[2]); img.data[i+3]=cl(a);
+    if (a>127){ sr+=c[0]; sg+=c[1]; sb+=c[2]; n++; }
+  }
+  tileAvg[t] = n ? [sr/n/255, sg/n/255, sb/n/255] : [1,1,1];
+}
+const vary = (r,c,amt) => { const k=(r()-.5)*amt; return [c[0]+k,c[1]+k,c[2]+k]; };
+const DIRT=[122,84,54], GRASS=[92,156,60], STONE=[124,125,128];
+function spots(r, n, rad){ const s=[]; for (let i=0;i<n;i++) s.push([1+r()*13, 1+r()*13, rad*(0.7+r()*0.6)]); return (x,y)=>s.some(([sx,sy,sr])=>(x-sx)**2+(y-sy)**2<sr*sr); }
+const dirtFn = r => (x,y) => r()<.14 ? vary(r,[92,62,40],14) : vary(r,DIRT,26);
+const stoneFn = r => { const st=[]; for(let i=0;i<4;i++) st.push([r()*16,r()*16,3+r()*5]); return (x,y)=> st.some(([sx,sy,l])=>Math.abs(y-sy)<0.6&&x>=sx&&x<sx+l) ? vary(r,[100,101,104],10) : vary(r,STONE,22); };
+
+paint(0, r => (x,y) => r()<.12 ? vary(r,[70,128,46],16) : vary(r,GRASS,30));                           // çimen üst
+paint(1, r => { const e=[...Array(16)].map(()=>3+Math.floor(r()*3)); const d=dirtFn(r);
+  return (x,y) => y<e[x] ? vary(r,GRASS,28) : (y===e[x] && r()<.5 ? vary(r,[78,120,50],10) : d(x,y)); });  // çimen yan
+paint(2, dirtFn);                                                                                        // toprak
+paint(3, stoneFn);                                                                                       // taş
+paint(4, r => (x,y) => r()<.08 ? vary(r,[196,180,128],10) : vary(r,[220,206,152],16));                  // kum
+paint(5, r => (x,y) => ((y+Math.round(Math.sin(x/2.6)*1.4))%5===0) ? vary(r,[92,146,232],10) : vary(r,[44,92,196],14)); // su
+paint(6, r => { const col=[...Array(16)].map(()=>r()); return (x,y) => (x%4===0||col[x]<.18) ? vary(r,[78,56,32],12) : vary(r,[112,84,50],18); }); // kütük yan
+paint(7, r => (x,y) => { const d=Math.max(Math.abs(x-7.5),Math.abs(y-7.5)); return d>6.6 ? vary(r,[96,72,42],14) : ((Math.floor(d)%2)?vary(r,[180,144,92],10):vary(r,[150,116,72],10)); }); // kütük üst
+paint(8, r => (x,y) => r()<.2 ? [0,0,0,0] : (r()<.15 ? vary(r,[110,170,70],18) : vary(r,[52,118,40],32)));  // yaprak
+paint(9, r => (x,y) => { const row=y>>2, seam=(row*5+3)%16; return (y%4===3||x===seam) ? vary(r,[118,88,52],8) : vary(r,[172,134,82],14); }); // tahta
+paint(10, r => (x,y) => (x===0||y===0||x===15||y===15) ? [214,236,246] : ((x-y===4&&x>5&&x<11)||(x-y===6&&x>8&&x<12)) ? [255,255,255,220] : [0,0,0,0]); // cam
+paint(11, r => (x,y) => { const off=((y>>2)%2)*4; return (y%4===3||(x+off)%8===7) ? vary(r,[196,190,178],10) : vary(r,[158,68,50],22); }); // tuğla
+paint(12, r => { const pts=[...Array(9)].map(()=>[r()*16,r()*16,110+r()*45]);
+  return (x,y) => { let d1=1e9,d2=1e9,c=0; for (const [px,py,s] of pts) for (let ox=-16;ox<=16;ox+=16) for (let oy=-16;oy<=16;oy+=16){ const d=Math.hypot(x+.5-px-ox,y+.5-py-oy); if(d<d1){d2=d1;d1=d;c=s;} else if(d<d2)d2=d; }
+    return d2-d1<1.3 ? vary(r,[72,72,76],10) : vary(r,[c,c,c+3],14); }; });                            // parke taşı
+paint(13, r => (x,y) => vary(r,[238,243,250],10));                                                        // kar
+paint(14, r => { const e=[...Array(16)].map(()=>2+Math.floor(r()*3)); const d=dirtFn(r); return (x,y) => y<e[x] ? vary(r,[236,242,250],10) : d(x,y); }); // kar yan
+paint(15, r => (x,y) => vary(r,[58,58,62],70));                                                           // ana kaya
+paint(16, r => { const s=spots(r,5,1.5), b=stoneFn(r); return (x,y) => s(x,y) ? vary(r,[34,34,38],16) : b(x,y); });       // kömür
+paint(17, r => { const s=spots(r,4,1.4), b=stoneFn(r); return (x,y) => s(x,y) ? vary(r,[70,224,214],30) : b(x,y); });     // gök cevheri
+paint(18, r => (x,y) => { const f=((x+y)%8<1||(x-y+16)%8<1); return f ? vary(r,[180,250,246],12) : vary(r,[64,196,206],18+ (x<2||y<2?20:0)); }); // gök kristali
+paint(19, r => (x,y) => { const c=(x===0||x===15) ? [60,110,40] : ((x%4===2&&y%3===0)?[220,220,180]:[84,150,58]); return vary(r,c,14); }); // kaktüs
+actx2.putImageData(img, 0, 0);
+
+// ---------------------------------------------------------------- bloklar
+const B = { AIR:0, GRASS:1, DIRT:2, STONE:3, SAND:4, WATER:5, LOG:6, LEAVES:7, PLANKS:8, GLASS:9, BRICK:10, COBBLE:11, SNOW:12, BEDROCK:13, COAL:14, SKYORE:15, CRYSTAL:16, CACTUS:17 };
+const INFO = [];
+function def(id, name, tiles, opts){ if (typeof tiles==='number') tiles=[tiles,tiles,tiles]; INFO[id]=Object.assign({ name, tiles, solid:true, opaque:true, lightBlock:true }, opts||{}); }
+def(0,'Hava',0,{solid:false,opaque:false,lightBlock:false});
+def(B.GRASS,'Çimen',[0,2,1]);
+def(B.DIRT,'Toprak',2);
+def(B.STONE,'Taş',3);
+def(B.SAND,'Kum',4);
+def(B.WATER,'Su',5,{solid:false,opaque:false,lightBlock:false});
+def(B.LOG,'Kütük',[7,7,6]);
+def(B.LEAVES,'Yaprak',8,{opaque:false});
+def(B.PLANKS,'Tahta',9);
+def(B.GLASS,'Cam',10,{opaque:false,lightBlock:false});
+def(B.BRICK,'Tuğla',11);
+def(B.COBBLE,'Parke taşı',12);
+def(B.SNOW,'Karlı toprak',[13,2,14]);
+def(B.BEDROCK,'Ana kaya',15);
+def(B.COAL,'Kömür cevheri',16);
+def(B.SKYORE,'Gök cevheri',17);
+def(B.CRYSTAL,'Gök kristali',18);
+def(B.CACTUS,'Kaktüs',[19,19,19]);
+const OPAQUE = new Uint8Array(256), SOLID = new Uint8Array(256), LIGHTB = new Uint8Array(256);
+INFO.forEach((v,i)=>{ OPAQUE[i]=v.opaque?1:0; SOLID[i]=v.solid?1:0; LIGHTB[i]=v.lightBlock?1:0; });
+const PLACEABLE = INFO.map((v,i)=>i).filter(i=>i!==0 && i!==B.BEDROCK);
+
+// ---------------------------------------------------------------- arazi üretimi
+class Gen {
+  constructor(seed){ this.seed=seed; this.a=new Perlin(seed); this.b=new Perlin(seed+11); this.c=new Perlin(seed+23); this.d=new Perlin(seed+37); }
+  height(x,z){
+    const cont=this.a.fbm2(x/340,z/340,3), hills=this.a.fbm2(x/72+50,z/72-30,4);
+    let m=this.b.fbm2(x/210,z/210,4)+0.04; m = m>0 ? m*m*170 : 0;
+    return Math.max(3, Math.min(CH-12, Math.floor(SEA+2+cont*16+hills*7+m)));
+  }
+  dry(x,z){ return this.d.fbm2(x/260+7,z/260-3,3); }
+  snowLine(x,z){ return 50+Math.floor(hash3(x,0,z,this.seed)*4); }
+  surface(x,z,h){
+    if (h<=SEA+1) return B.SAND;
+    if (h>=this.snowLine(x,z)) return B.SNOW;
+    if (h>46) return B.STONE;
+    if (this.dry(x,z)>0.22) return B.SAND;
+    return B.GRASS;
+  }
+  feature(x,z){ // ağaç / kaktüs
+    const r=hash3(x,1,z,this.seed);
+    if (r>0.06) return null;
+    const h=this.height(x,z), s=this.surface(x,z,h);
+    if (s===B.GRASS){ const f=Math.max(0,this.c.fbm2(x/110,z/110,2)); if (r < 0.004+f*0.06) return {type:'tree', h, t:4+Math.floor(hash3(x,2,z,this.seed)*3)}; }
+    else if (s===B.SAND && h>SEA+1 && r<0.006) return {type:'cactus', h, t:2+Math.floor(hash3(x,3,z,this.seed)*3)};
+    return null;
+  }
+  fill(ch){
+    const d=ch.data, ox=ch.cx*CS, oz=ch.cz*CS, seed=this.seed;
+    for (let lz=0;lz<CS;lz++) for (let lx=0;lx<CS;lx++){
+      const x=ox+lx, z=oz+lz, h=this.height(x,z), top=this.surface(x,z,h);
+      const sub = top===B.SAND ? B.SAND : top===B.STONE ? B.STONE : B.DIRT;
+      for (let y=0;y<CH;y++){
+        let b=0;
+        if (y===0) b=B.BEDROCK;
+        else if (y<=h){
+          if (y===h) b=top; else if (y>h-4) b=sub; else {
+            b=B.STONE;
+            const o=hash3(x,y,z,seed^0x5bd1);
+            if (o<0.011) b=B.COAL; else if (y<22 && o<0.0145) b=B.SKYORE;
+          }
+          if (y>=2 && y<h-4){ // mağaralar: iki gürültü yüzeyinin kesiştiği tüneller
+            const c1=this.c.n3(x/26,y/17,z/26), c2=this.c.n3(x/26+91.7,y/17,z/26+13.3);
+            if (c1*c1+c2*c2 < 0.0055) b=0;
+          }
+        } else if (y<=SEA) b=B.WATER;
+        if (b) d[lx+lz*CS+y*CA]=b;
+      }
+    }
+    const put=(x,y,z,b,over)=>{ const lx=x-ox, lz=z-oz; if (lx<0||lz<0||lx>=CS||lz>=CS||y<1||y>=CH) return; const i=lx+lz*CS+y*CA; if (!d[i] || over) d[i]=b; };
+    for (let z=oz-3; z<oz+CS+3; z++) for (let x=ox-3; x<ox+CS+3; x++){
+      const f=this.feature(x,z); if (!f) continue;
+      if (f.type==='cactus'){ for (let i=1;i<=f.t;i++) put(x,f.h+i,z,B.CACTUS,true); continue; }
+      const top=f.h+f.t;
+      for (let dy=-2; dy<=1; dy++){
+        const rad = dy<0 ? 2 : 1, yy=top+dy;
+        for (let dz=-rad; dz<=rad; dz++) for (let dx=-rad; dx<=rad; dx++){
+          if (Math.abs(dx)===rad && Math.abs(dz)===rad && (dy===1 || hash3(x+dx,yy,z+dz,seed)<0.5)) continue;
+          put(x+dx,yy,z+dz,B.LEAVES,false);
+        }
+      }
+      for (let i=1;i<=f.t;i++) put(x,f.h+i,z,B.LOG,true);
+      put(x,f.h,z,B.DIRT,true);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- three.js kurulumu
+const canvas = $('game');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, isTouch?1.5:2));
+renderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color();
+scene.fog = new THREE.Fog(0x9cc8f0, 40, 100);
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.08, 1200);
+camera.rotation.order = 'YXZ';
+
+const tex = new THREE.CanvasTexture(atlas);
+tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
+const matSolid = new THREE.MeshBasicMaterial({ map:tex, vertexColors:true, alphaTest:0.5 });
+const matWater = new THREE.MeshBasicMaterial({ map:tex, vertexColors:true, transparent:true, opacity:0.74, depthWrite:false, side:THREE.DoubleSide });
+
+const selBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004,1.004,1.004)), new THREE.LineBasicMaterial({ color:0x000000, transparent:true, opacity:0.55 }));
+selBox.visible = false; scene.add(selBox);
+
+function makeDisc(color, size){
+  const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+  g.fillStyle=color; g.fillRect(8,8,48,48); g.globalAlpha=.25; g.fillRect(0,0,64,64);
+  const t=new THREE.CanvasTexture(c); t.magFilter=THREE.NearestFilter;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(size,size), new THREE.MeshBasicMaterial({ map:t, transparent:true, fog:false, depthWrite:false }));
+  m.renderOrder=-1; scene.add(m); return m;
+}
+const sun = makeDisc('#fff3b8', 60), moon = makeDisc('#dfe6f5', 40);
+
+// ---------------------------------------------------------------- dünya
+const FACES = [
+  { d:[-1,0,0], s:.80, c:[[0,1,0],[0,0,0],[0,1,1],[0,0,1]], uv:[[0,1],[0,0],[1,1],[1,0]] },
+  { d:[ 1,0,0], s:.80, c:[[1,1,1],[1,0,1],[1,1,0],[1,0,0]], uv:[[0,1],[0,0],[1,1],[1,0]] },
+  { d:[0,-1,0], s:.50, c:[[1,0,1],[0,0,1],[1,0,0],[0,0,0]], uv:[[1,0],[0,0],[1,1],[0,1]] },
+  { d:[0, 1,0], s:1.0, c:[[0,1,1],[1,1,1],[0,1,0],[1,1,0]], uv:[[1,1],[0,1],[1,0],[0,0]] },
+  { d:[0,0,-1], s:.66, c:[[1,0,0],[0,0,0],[1,1,0],[0,1,0]], uv:[[0,0],[1,0],[0,1],[1,1]] },
+  { d:[0,0, 1], s:.66, c:[[0,0,1],[1,0,1],[0,1,1],[1,1,1]], uv:[[0,0],[1,0],[0,1],[1,1]] },
+];
+// köşe gölgesi (ambient occlusion) için her köşenin üç komşusu
+FACES.forEach(F=>{
+  const a = F.d[0]?0:F.d[1]?1:2, u=(a+1)%3, v=(a+2)%3;
+  F.ao = F.c.map(c=>{
+    const su=c[u]?1:-1, sv=c[v]?1:-1, s1=[...F.d], s2=[...F.d], cr=[...F.d];
+    s1[u]+=su; s2[v]+=sv; cr[u]+=su; cr[v]+=sv; return [s1,s2,cr];
+  });
+});
+const AOL = [0.42, 0.62, 0.80, 1];
+
+const chunks = new Map();
+const ckey = (cx,cz) => cx+','+cz;
+let gen, seedStr, edits = new Map(), editsDirty = false;
+
+class Chunk {
+  constructor(cx,cz){ this.cx=cx; this.cz=cz; this.data=new Uint8Array(CA*CH); this.top=new Int16Array(CA); this.maxY=0; this.mesh=null; this.water=null; this.dirty=true; }
+  computeTop(){
+    const d=this.data; let maxY=0;
+    for (let i=0;i<CA;i++){
+      let t=0, any=0;
+      for (let y=CH-1;y>=0;y--){ const b=d[i+y*CA]; if (b && !any){ any=y; } if (LIGHTB[b]){ t=y; break; } }
+      this.top[i]=t; if (any>maxY) maxY=any;
+    }
+    this.maxY=maxY;
+  }
+  dispose(){
+    for (const m of [this.mesh,this.water]) if (m){ scene.remove(m); m.geometry.dispose(); }
+    this.mesh=this.water=null;
+  }
+}
+
+function generateChunk(cx,cz){
+  const ch=new Chunk(cx,cz); gen.fill(ch);
+  const e=edits.get(ckey(cx,cz)); if (e) for (const [i,b] of e) ch.data[i]=b;
+  ch.computeTop(); chunks.set(ckey(cx,cz), ch);
+  for (let dx=-1;dx<=1;dx++) for (let dz=-1;dz<=1;dz++){ const n=chunks.get(ckey(cx+dx,cz+dz)); if (n) n.dirty=true; }
+  return ch;
+}
+
+function getBlock(x,y,z){
+  if (y<0) return B.BEDROCK; if (y>=CH) return 0;
+  const cx=Math.floor(x/CS), cz=Math.floor(z/CS), ch=chunks.get(ckey(cx,cz));
+  if (!ch) return y<SEA?B.STONE:0;
+  return ch.data[(x-cx*CS)+(z-cz*CS)*CS+y*CA];
+}
+
+function setBlock(x,y,z,b){
+  if (y<1||y>=CH) return false;
+  const cx=Math.floor(x/CS), cz=Math.floor(z/CS), ch=chunks.get(ckey(cx,cz)); if (!ch) return false;
+  const lx=x-cx*CS, lz=z-cz*CS, ci=lx+lz*CS, i=ci+y*CA;
+  ch.data[i]=b;
+  if (LIGHTB[b] && y>ch.top[ci]) ch.top[ci]=y;
+  else if (!LIGHTB[b] && y===ch.top[ci]){ let t=0; for (let yy=y-1;yy>=0;yy--) if (LIGHTB[ch.data[ci+yy*CA]]){ t=yy; break; } ch.top[ci]=t; }
+  if (b && y>ch.maxY) ch.maxY=y;
+  const k=ckey(cx,cz); if (!edits.has(k)) edits.set(k,new Map()); edits.get(k).set(i,b); editsDirty=true;
+  const rebuild=new Set([ch]);
+  const xs=[0], zs=[0]; if (lx===0) xs.push(-1); if (lx===CS-1) xs.push(1); if (lz===0) zs.push(-1); if (lz===CS-1) zs.push(1);
+  for (const dx of xs) for (const dz of zs){ const n=chunks.get(ckey(cx+dx,cz+dz)); if (n) rebuild.add(n); }
+  for (const c of rebuild) meshChunk(c);
+  return true;
+}
+
+function meshChunk(ch){
+  const nb=[]; for (let dx=-1;dx<=1;dx++) for (let dz=-1;dz<=1;dz++) nb.push(chunks.get(ckey(ch.cx+dx,ch.cz+dz)));
+  const sel=(x,z)=>{ let i=4; if (x<0) i-=3; else if (x>=CS) i+=3; if (z<0) i-=1; else if (z>=CS) i+=1; return nb[i]; };
+  const get=(x,y,z)=>{
+    if (y<0) return B.BEDROCK; if (y>=CH) return 0;
+    if (x>=0&&x<CS&&z>=0&&z<CS) return ch.data[x+z*CS+y*CA];
+    const c=sel(x,z); return c ? c.data[((x+CS)%CS)+((z+CS)%CS)*CS+y*CA] : 0;
+  };
+  const topAt=(x,z)=>{ if (x>=0&&x<CS&&z>=0&&z<CS) return ch.top[x+z*CS]; const c=sel(x,z); return c ? c.top[((x+CS)%CS)+((z+CS)%CS)*CS] : 0; };
+  const O={pos:[],uv:[],col:[],idx:[]}, W={pos:[],uv:[],col:[],idx:[]};
+  const su=1/ACOLS, sv=1/AROWS, eu=0.25/atlas.width, ev=0.25/atlas.height, d=ch.data;
+  const maxY=Math.min(CH-1, ch.maxY);
+  for (let y=0;y<=maxY;y++) for (let z=0;z<CS;z++) for (let x=0;x<CS;x++){
+    const b=d[x+z*CS+y*CA]; if (!b) continue;
+    const isW = b===B.WATER, T = isW?W:O, tiles=INFO[b].tiles;
+    const waterTop = isW && get(x,y+1,z)!==B.WATER;
+    for (let f=0;f<6;f++){
+      const F=FACES[f], nx=x+F.d[0], ny=y+F.d[1], nz=z+F.d[2], n=get(nx,ny,nz);
+      if (isW){ if (n===B.WATER || OPAQUE[n]) continue; }
+      else { if (OPAQUE[n]) continue; if (n===b && b!==B.LEAVES) continue; }
+      const t=topAt(nx,nz), L = ny>t ? 1 : Math.max(0.3, 0.92-(t-ny)*0.075);
+      const tile=tiles[f===3?0:f===2?1:2], tu=(tile%ACOLS)*su, tv=1-(Math.floor(tile/ACOLS)+1)*sv;
+      const base=T.pos.length/3, ao=[3,3,3,3];
+      for (let k=0;k<4;k++){
+        const c=F.c[k];
+        T.pos.push(x+c[0], y+(waterTop&&c[1]===1?0.88:c[1]), z+c[2]);
+        T.uv.push(tu+eu+F.uv[k][0]*(su-2*eu), tv+ev+F.uv[k][1]*(sv-2*ev));
+        if (!isW){
+          const o=F.ao[k];
+          const s1=OPAQUE[get(x+o[0][0],y+o[0][1],z+o[0][2])], s2=OPAQUE[get(x+o[1][0],y+o[1][1],z+o[1][2])], cr=OPAQUE[get(x+o[2][0],y+o[2][1],z+o[2][2])];
+          ao[k] = (s1&&s2) ? 0 : 3-(s1+s2+cr);
+        }
+        const v=F.s*AOL[ao[k]]*L; T.col.push(v,v,v);
+      }
+      if (ao[0]+ao[3] > ao[1]+ao[2]) T.idx.push(base,base+1,base+3, base,base+3,base+2);
+      else T.idx.push(base,base+1,base+2, base+2,base+1,base+3);
+    }
+  }
+  ch.dispose();
+  const build=(A,mat,order)=>{
+    if (!A.idx.length) return null;
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(A.pos,3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(A.uv,2));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(A.col,3));
+    g.setIndex(A.idx); g.computeBoundingSphere();
+    const m=new THREE.Mesh(g,mat); m.position.set(ch.cx*CS,0,ch.cz*CS); m.renderOrder=order;
+    m.matrixAutoUpdate=false; m.updateMatrix(); scene.add(m); return m;
+  };
+  ch.mesh=build(O,matSolid,0); ch.water=build(W,matWater,1); ch.dirty=false;
+}
+
+let renderDist = isTouch ? 4 : 6;
+let lastCenter = '';
+function updateChunks(budgetMs){
+  const pcx=Math.floor(player.pos.x/CS), pcz=Math.floor(player.pos.z/CS), R=renderDist;
+  const t0=performance.now(), want=[];
+  for (let dz=-R-1; dz<=R+1; dz++) for (let dx=-R-1; dx<=R+1; dx++){
+    const dd=dx*dx+dz*dz; if (dd>(R+1.5)*(R+1.5)) continue; want.push([dd,pcx+dx,pcz+dz]);
+  }
+  want.sort((a,b)=>a[0]-b[0]);
+  for (const [dd,cx,cz] of want){
+    if (performance.now()-t0>budgetMs) break;
+    let ch=chunks.get(ckey(cx,cz));
+    if (!ch){ generateChunk(cx,cz); continue; }
+    if (ch.dirty && dd<=(R+0.5)*(R+0.5)){
+      let ok=true; for (let ax=-1;ax<=1&&ok;ax++) for (let az=-1;az<=1;az++) if (!chunks.has(ckey(cx+ax,cz+az))){ ok=false; break; }
+      if (ok) meshChunk(ch);
+    }
+  }
+  const center=pcx+','+pcz;
+  if (center!==lastCenter){
+    lastCenter=center;
+    for (const [k,ch] of chunks){ const dx=ch.cx-pcx, dz=ch.cz-pcz; if (dx*dx+dz*dz>(R+3)*(R+3)){ ch.dispose(); chunks.delete(k); } }
+  }
+}
+
+// ---------------------------------------------------------------- oyuncu
+const player = { pos:new THREE.Vector3(), vel:new THREE.Vector3(), yaw:0, pitch:0, onGround:false, fly:false, inWater:false };
+const PW=0.3, PH=1.8, EYE=1.62;
+function collides(p){
+  const x0=Math.floor(p.x-PW), x1=Math.floor(p.x+PW-1e-6), y0=Math.floor(p.y), y1=Math.floor(p.y+PH-1e-6), z0=Math.floor(p.z-PW), z1=Math.floor(p.z+PW-1e-6);
+  for (let y=y0;y<=y1;y++) for (let z=z0;z<=z1;z++) for (let x=x0;x<=x1;x++) if (SOLID[getBlock(x,y,z)]) return true;
+  return false;
+}
+function moveAxis(ax, dist){
+  const p=player.pos, n=Math.max(1,Math.ceil(Math.abs(dist)/0.3)), s=dist/n, k=['x','y','z'][ax];
+  for (let i=0;i<n;i++){
+    p[k]+=s;
+    if (collides(p)){
+      if (ax===1){ if (s<0){ p.y=Math.floor(p.y)+1; player.onGround=true; } else p.y=Math.floor(p.y+PH)-PH-0.001; }
+      else { const h=PW; if (s>0) p[k]=Math.floor(p[k]+h)-h-0.001; else p[k]=Math.floor(p[k]-h)+1+h+0.001; }
+      player.vel[k]=0; return true;
+    }
+  }
+  return false;
+}
+
+const keys = new Set();
+const input = { mx:0, mz:0, jump:false, down:false, sprint:false };
+function stepPlayer(dt){
+  const p=player.pos, v=player.vel;
+  player.inWater = getBlock(Math.floor(p.x),Math.floor(p.y+0.5),Math.floor(p.z))===B.WATER;
+  let mx=input.mx, mz=input.mz;
+  if (keys.has('KeyW')||keys.has('ArrowUp')) mz+=1; if (keys.has('KeyS')||keys.has('ArrowDown')) mz-=1;
+  if (keys.has('KeyD')||keys.has('ArrowRight')) mx+=1; if (keys.has('KeyA')||keys.has('ArrowLeft')) mx-=1;
+  const jump=input.jump||keys.has('Space'), down=input.down||keys.has('ShiftLeft')||keys.has('ShiftRight');
+  const sprint=!player.fly && (keys.has('ShiftLeft')||keys.has('ShiftRight')||input.sprint);
+  const len=Math.hypot(mx,mz); if (len>1){ mx/=len; mz/=len; }
+  const sy=Math.sin(player.yaw), cy=Math.cos(player.yaw);
+  const speed = player.fly ? 11 : player.inWater ? 2.8 : sprint ? 5.8 : 4.3;
+  const wx=(-sy*mz+cy*mx)*speed, wz=(-cy*mz-sy*mx)*speed;
+  const wasGround=player.onGround;
+  if (player.fly){
+    v.x=wx; v.z=wz; v.y=((jump?1:0)-(down?1:0))*speed*0.8;
+  } else {
+    const k=Math.min(1, dt*(wasGround?16:player.inWater?6:5));
+    v.x+=(wx-v.x)*k; v.z+=(wz-v.z)*k;
+    if (player.inWater){ v.y-=10*dt; v.y*=Math.max(0,1-3*dt); if (jump) v.y=Math.min(v.y+26*dt, 3.4); }
+    else { v.y-=27*dt; if (jump && wasGround) v.y=8.7; }
+    if (v.y<-45) v.y=-45;
+  }
+  player.onGround=false;
+  const hx=moveAxis(0,v.x*dt), hz=moveAxis(2,v.z*dt); moveAxis(1,v.y*dt);
+  if ((hx||hz) && !player.fly){
+    const headFree=!SOLID[getBlock(Math.floor(p.x+Math.sign(wx)*0.6),Math.floor(p.y+PH+0.5),Math.floor(p.z+Math.sign(wz)*0.6))];
+    if (player.inWater && jump) v.y=5.2;
+    else if (isTouch && wasGround && (Math.abs(wx)+Math.abs(wz))>0.1 && headFree) v.y=8.7; // dokunmatikte otomatik basamak çıkma
+  }
+  if (p.y<-30) spawn(true);
+}
+
+// ---------------------------------------------------------------- ışın atma (DDA)
+function raycast(max){
+  const o=camera.position, d=new THREE.Vector3(); camera.getWorldDirection(d);
+  let x=Math.floor(o.x), y=Math.floor(o.y), z=Math.floor(o.z);
+  const sx=Math.sign(d.x), sy=Math.sign(d.y), sz=Math.sign(d.z);
+  const tdx=sx?Math.abs(1/d.x):Infinity, tdy=sy?Math.abs(1/d.y):Infinity, tdz=sz?Math.abs(1/d.z):Infinity;
+  let tx=sx>0?(x+1-o.x)*tdx:sx<0?(o.x-x)*tdx:Infinity, ty=sy>0?(y+1-o.y)*tdy:sy<0?(o.y-y)*tdy:Infinity, tz=sz>0?(z+1-o.z)*tdz:sz<0?(o.z-z)*tdz:Infinity;
+  let px=x,py=y,pz=z,t=0;
+  while (t<=max){
+    const b=getBlock(x,y,z);
+    if (b && b!==B.WATER) return { x,y,z,b,px,py,pz };
+    px=x; py=y; pz=z;
+    if (tx<ty && tx<tz){ x+=sx; t=tx; tx+=tdx; } else if (ty<tz){ y+=sy; t=ty; ty+=tdy; } else { z+=sz; t=tz; tz+=tdz; }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------- ses
+let audio=null, noiseBuf=null;
+function initAudio(){
+  if (audio) { if (audio.state==='suspended') audio.resume(); return; }
+  try {
+    audio=new (window.AudioContext||window.webkitAudioContext)();
+    noiseBuf=audio.createBuffer(1, audio.sampleRate*0.3, audio.sampleRate);
+    const ch=noiseBuf.getChannelData(0); for (let i=0;i<ch.length;i++) ch[i]=Math.random()*2-1;
+  } catch(e){ audio=null; }
+}
+function sfx(kind){
+  if (!audio) return;
+  const t=audio.currentTime, src=audio.createBufferSource(), f=audio.createBiquadFilter(), g=audio.createGain();
+  src.buffer=noiseBuf; f.type='lowpass'; f.frequency.value = kind==='break' ? 700+Math.random()*300 : 1500+Math.random()*400;
+  const len = kind==='break' ? 0.2 : 0.09;
+  g.gain.setValueAtTime(kind==='break'?0.35:0.25,t); g.gain.exponentialRampToValueAtTime(0.001,t+len);
+  src.connect(f); f.connect(g); g.connect(audio.destination); src.start(t); src.stop(t+len+0.02);
+}
+
+// ---------------------------------------------------------------- parçacıklar
+const particles=[], pGeo=new THREE.BoxGeometry(0.11,0.11,0.11);
+function burst(x,y,z,b){
+  const c=tileAvg[INFO[b].tiles[2]];
+  const mat=new THREE.MeshBasicMaterial({ color:new THREE.Color(c[0],c[1],c[2]) });
+  for (let i=0;i<10;i++){
+    const m=new THREE.Mesh(pGeo,mat); m.position.set(x+0.2+Math.random()*0.6, y+0.2+Math.random()*0.6, z+0.2+Math.random()*0.6);
+    m.userData={ v:new THREE.Vector3((Math.random()-.5)*3, Math.random()*3+1, (Math.random()-.5)*3), life:0.5+Math.random()*0.3, mat };
+    scene.add(m); particles.push(m);
+  }
+}
+function stepParticles(dt){
+  for (let i=particles.length-1;i>=0;i--){
+    const m=particles[i], u=m.userData; u.life-=dt; u.v.y-=14*dt; m.position.addScaledVector(u.v,dt);
+    if (SOLID[getBlock(Math.floor(m.position.x),Math.floor(m.position.y),Math.floor(m.position.z))]){ m.position.addScaledVector(u.v,-dt); u.v.set(0,0,0); }
+    if (u.life<=0){ scene.remove(m); particles.splice(i,1); if (!particles.some(p=>p.userData.mat===u.mat)) u.mat.dispose(); }
+  }
+}
+
+// ---------------------------------------------------------------- etkileşim
+let target=null;
+function breakBlock(){
+  if (!target || target.b===B.BEDROCK) return;
+  if (setBlock(target.x,target.y,target.z,0)){ burst(target.x,target.y,target.z,target.b); sfx('break'); }
+}
+function placeBlock(){
+  if (!target) return;
+  const b=hotbar[sel], {px,py,pz}=target, cur=getBlock(px,py,pz);
+  if (cur && cur!==B.WATER) return;
+  if (SOLID[b]){
+    const p=player.pos;
+    if (px+1>p.x-PW && px<p.x+PW && pz+1>p.z-PW && pz<p.z+PW && py+1>p.y && py<p.y+PH) return;
+  }
+  if (setBlock(px,py,pz,b)) sfx('place');
+}
+function pickBlock(){ if (target && PLACEABLE.includes(target.b)){ hotbar[sel]=target.b; renderHotbar(); showName(); } }
+
+// ---------------------------------------------------------------- blok çubuğu
+const iconCache=new Map();
+function blockIcon(b){
+  if (iconCache.has(b)) return iconCache.get(b);
+  const c=document.createElement('canvas'); c.width=c.height=32; const g=c.getContext('2d'); g.imageSmoothingEnabled=false;
+  const t=INFO[b].tiles, src=i=>[(i%ACOLS)*TILE, Math.floor(i/ACOLS)*TILE];
+  const face=(tile, m, shade)=>{ g.setTransform(...m); const [sx,sy]=src(tile); g.drawImage(atlas,sx,sy,TILE,TILE,0,0,16,16); if (shade){ g.fillStyle=`rgba(0,0,0,${shade})`; g.fillRect(0,0,16,16); } };
+  face(t[0],[1,0.5,-1,0.5,16,0],0);
+  face(t[2],[1,0.5,0,1,0,8],0.18);
+  face(t[2],[1,-0.5,0,1,16,16],0.36);
+  const url=c; iconCache.set(b,url); return url;
+}
+function iconCanvas(b){ const c=document.createElement('canvas'); c.width=c.height=32; c.getContext('2d').drawImage(blockIcon(b),0,0); return c; }
+
+let hotbar=[B.GRASS,B.DIRT,B.STONE,B.COBBLE,B.PLANKS,B.LOG,B.BRICK,B.GLASS,B.CRYSTAL], sel=0;
+function renderHotbar(){
+  const hb=$('hotbar'); hb.innerHTML='';
+  hotbar.forEach((b,i)=>{
+    const s=document.createElement('div'); s.className='slot'+(i===sel?' sel':'');
+    s.appendChild(iconCanvas(b)); const n=document.createElement('span'); n.textContent=i+1; s.appendChild(n);
+    s.addEventListener('pointerdown', e=>{ e.stopPropagation(); e.preventDefault(); selectSlot(i); });
+    hb.appendChild(s);
+  });
+}
+let nameTimer=0;
+function showName(){ const el=$('blockname'); el.textContent=INFO[hotbar[sel]].name; el.style.opacity=1; clearTimeout(nameTimer); nameTimer=setTimeout(()=>el.style.opacity=0,1200); }
+function selectSlot(i){ sel=(i+9)%9; renderHotbar(); showName(); }
+
+function buildInventory(){
+  const g=$('invGrid'); g.innerHTML='';
+  PLACEABLE.forEach(b=>{
+    const s=document.createElement('div'); s.className='slot'; s.title=INFO[b].name; s.appendChild(iconCanvas(b));
+    s.addEventListener('click', ()=>{ hotbar[sel]=b; renderHotbar(); showName(); closeInventory(); });
+    g.appendChild(s);
+  });
+}
+function openInventory(){ if (state!=='play') return; state='inv'; $('inv').classList.remove('hidden'); if (document.pointerLockElement) document.exitPointerLock(); }
+function closeInventory(){ $('inv').classList.add('hidden'); state='play'; if (!isTouch) lockPointer(); }
+$('invClose').onclick=closeInventory;
+
+// ---------------------------------------------------------------- kayıt
+function saveMeta(){
+  store.set('kupdiyar.world', JSON.stringify({ seed:seedStr, x:player.pos.x, y:player.pos.y, z:player.pos.z, yaw:player.yaw, pitch:player.pitch, fly:player.fly, time:dayTime, hotbar, sel, dist:renderDist }));
+}
+function saveEdits(){
+  if (!editsDirty) return; editsDirty=false;
+  const o={}; for (const [k,m] of edits){ const a=[]; for (const [i,b] of m) a.push(i,b); o[k]=a; }
+  store.set('kupdiyar.edits.'+seedStr, JSON.stringify(o));
+}
+function loadEdits(){
+  edits=new Map();
+  try { const o=JSON.parse(store.get('kupdiyar.edits.'+seedStr)||'{}'); for (const k in o){ const m=new Map(), a=o[k]; for (let i=0;i<a.length;i+=2) m.set(a[i],a[i+1]); edits.set(k,m); } } catch(e){}
+}
+setInterval(()=>{ if (ready){ saveEdits(); saveMeta(); } }, 3000);
+addEventListener('pagehide', ()=>{ if (ready){ saveEdits(); saveMeta(); } });
+document.addEventListener('visibilitychange', ()=>{ if (document.hidden && ready){ saveEdits(); saveMeta(); } });
+
+// ---------------------------------------------------------------- dünya yükleme / doğma
+let ready=false, pendingSpawn=null;
+function loadWorld(seed, resume){
+  for (const ch of chunks.values()) ch.dispose(); chunks.clear(); lastCenter='';
+  seedStr=seed; gen=new Gen(hashStr(seed)); loadEdits(); ready=false;
+  if (resume){ player.pos.set(resume.x,resume.y,resume.z); player.yaw=resume.yaw||0; player.pitch=resume.pitch||0; player.fly=!!resume.fly; pendingSpawn=null; }
+  else { player.fly=false; spawn(false); }
+  player.vel.set(0,0,0); $('seed').value=seed; updateFlyBtn();
+}
+function spawn(keepXZ){
+  let sx=0, sz=0;
+  if (keepXZ){ sx=Math.floor(player.pos.x); sz=Math.floor(player.pos.z); }
+  else for (let r=0;r<400;r+=8){ let found=false; for (let a=0;a<8;a++){ const x=Math.round(Math.cos(a*0.785)*r), z=Math.round(Math.sin(a*0.785)*r); if (gen.height(x,z)>SEA+1){ sx=x; sz=z; found=true; break; } } if (found) break; }
+  player.pos.set(sx+0.5, CH, sz+0.5); player.vel.set(0,0,0); pendingSpawn=[sx,sz]; ready=false;
+}
+function finishSpawn(){
+  if (pendingSpawn){
+    const [x,z]=pendingSpawn; let y=CH-1; while (y>0 && !SOLID[getBlock(x,y,z)]) y--;
+    while (y<CH-2 && (SOLID[getBlock(x,y+1,z)]||SOLID[getBlock(x,y+2,z)])) y++;
+    player.pos.y=y+1; pendingSpawn=null;
+  }
+  ready=true;
+}
+function chunkReadyAtPlayer(){
+  const cx=Math.floor(player.pos.x/CS), cz=Math.floor(player.pos.z/CS);
+  for (let dx=-1;dx<=1;dx++) for (let dz=-1;dz<=1;dz++){ const c=chunks.get(ckey(cx+dx,cz+dz)); if (!c || c.dirty) return false; }
+  return true;
+}
+
+// ---------------------------------------------------------------- gündüz / gece
+let dayTime=0.06; const DAY_LEN=720;
+const skyDay=new THREE.Color(0x8ec5f2), skyNight=new THREE.Color(0x0a0f24), skyDusk=new THREE.Color(0xf09a5a), tmpC=new THREE.Color();
+const smooth=(a,b,x)=>{ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); };
+function stepSky(dt){
+  dayTime=(dayTime+dt/DAY_LEN)%1;
+  const ang=dayTime*Math.PI*2, h=Math.sin(ang), k=smooth(-0.18,0.28,h);
+  tmpC.copy(skyNight).lerp(skyDay,k);
+  const dusk=Math.max(0,1-Math.abs(h)/0.22)*0.55; tmpC.lerp(skyDusk,dusk*(Math.cos(ang)>0?1:0.8));
+  const underwater=getBlock(Math.floor(camera.position.x),Math.floor(camera.position.y),Math.floor(camera.position.z))===B.WATER;
+  if (underwater){ scene.background.setRGB(0.08,0.2,0.45); scene.fog.color.copy(scene.background); scene.fog.near=1; scene.fog.far=18; }
+  else { scene.background.copy(tmpC); scene.fog.color.copy(tmpC); scene.fog.near=renderDist*CS*0.55; scene.fog.far=renderDist*CS*0.95; }
+  $('underwater').style.display=underwater?'block':'none';
+  const light=0.22+0.78*k; matSolid.color.setScalar(light); matWater.color.setScalar(light);
+  const dir=new THREE.Vector3(Math.cos(ang),Math.sin(ang),0.25).normalize();
+  sun.position.copy(camera.position).addScaledVector(dir,400); sun.lookAt(camera.position);
+  moon.position.copy(camera.position).addScaledVector(dir,-400); moon.lookAt(camera.position);
+}
+
+// ---------------------------------------------------------------- girdi: masaüstü
+let state='menu';
+function lockPointer(){ try { const p=canvas.requestPointerLock(); if (p && p.catch) p.catch(()=>{}); } catch(e){} }
+const mouse={ l:false, r:false, t:0 };
+canvas.addEventListener('mousedown', e=>{
+  if (isTouch || state!=='play') return;
+  if (!document.pointerLockElement){ lockPointer(); return; }
+  if (e.button===0){ mouse.l=true; mouse.t=0.25; breakBlock(); }
+  else if (e.button===2){ mouse.r=true; mouse.t=0.25; placeBlock(); }
+  else if (e.button===1){ e.preventDefault(); pickBlock(); }
+});
+addEventListener('mouseup', e=>{ if (e.button===0) mouse.l=false; if (e.button===2) mouse.r=false; });
+addEventListener('contextmenu', e=>e.preventDefault());
+addEventListener('mousemove', e=>{
+  if (document.pointerLockElement!==canvas) return;
+  player.yaw-=e.movementX*0.0024; player.pitch-=e.movementY*0.0024;
+  player.pitch=Math.max(-1.55,Math.min(1.55,player.pitch));
+});
+addEventListener('wheel', e=>{ if (state==='play' && document.pointerLockElement) selectSlot(sel+(e.deltaY>0?1:-1)); }, { passive:true });
+document.addEventListener('pointerlockchange', ()=>{ if (!document.pointerLockElement && state==='play' && !isTouch) showMenu(); });
+let showInfo=!isTouch;
+addEventListener('keydown', e=>{
+  if (e.code==='KeyE' && state==='inv'){ closeInventory(); return; }
+  if (state!=='play') return;
+  keys.add(e.code);
+  if (e.code.startsWith('Digit')){ const n=+e.code.slice(5); if (n>=1&&n<=9) selectSlot(n-1); }
+  if (e.code==='KeyF') toggleFly();
+  if (e.code==='KeyE') openInventory();
+  if (e.code==='F3'){ e.preventDefault(); showInfo=!showInfo; }
+  if (e.code==='Space' || e.code.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup', e=>keys.delete(e.code));
+addEventListener('blur', ()=>{ keys.clear(); mouse.l=mouse.r=false; });
+function toggleFly(){ player.fly=!player.fly; player.vel.y=0; updateFlyBtn(); hint(player.fly?'Uçma açık':'Uçma kapalı'); }
+function updateFlyBtn(){ $('tFly').classList.toggle('on',player.fly); $('tDown').classList.toggle('hidden',!player.fly); }
+
+// ---------------------------------------------------------------- girdi: dokunmatik
+const touchLook=new Map(); let stickId=null, stickO=null;
+const stickEl=$('stick'), knob=$('knob');
+function onTouchStart(e){
+  if (state!=='play') return; e.preventDefault(); initAudio();
+  for (const t of e.changedTouches){
+    if (t.clientX < innerWidth*0.42 && stickId===null){
+      stickId=t.identifier; stickO=[t.clientX,t.clientY];
+      stickEl.style.left=t.clientX+'px'; stickEl.style.top=t.clientY+'px'; stickEl.style.display='block'; knob.style.transform='';
+    } else {
+      const L={ x:t.clientX, y:t.clientY, sx:t.clientX, sy:t.clientY, t0:performance.now(), moved:false, breaking:false, timer:0 };
+      L.timer=setTimeout(()=>{ if (!L.moved){ L.breaking=true; L.rep=0; breakBlock(); } }, 320);
+      touchLook.set(t.identifier,L);
+    }
+  }
+}
+function onTouchMove(e){
+  e.preventDefault();
+  for (const t of e.changedTouches){
+    if (t.identifier===stickId){
+      let dx=t.clientX-stickO[0], dy=t.clientY-stickO[1]; const l=Math.hypot(dx,dy), m=45;
+      if (l>m){ dx*=m/l; dy*=m/l; }
+      knob.style.transform=`translate(${dx}px,${dy}px)`;
+      input.mx=dx/m; input.mz=-dy/m; input.sprint = l>m*1.6;
+    } else if (touchLook.has(t.identifier)){
+      const L=touchLook.get(t.identifier), dx=t.clientX-L.x, dy=t.clientY-L.y; L.x=t.clientX; L.y=t.clientY;
+      if (Math.hypot(t.clientX-L.sx,t.clientY-L.sy)>12) L.moved=true;
+      player.yaw-=dx*0.0055; player.pitch=Math.max(-1.55,Math.min(1.55,player.pitch-dy*0.0055));
+    }
+  }
+}
+function onTouchEnd(e){
+  for (const t of e.changedTouches){
+    if (t.identifier===stickId){ stickId=null; input.mx=input.mz=0; input.sprint=false; stickEl.style.display='none'; }
+    const L=touchLook.get(t.identifier);
+    if (L){ clearTimeout(L.timer); if (!L.moved && !L.breaking && performance.now()-L.t0<320) placeBlock(); touchLook.delete(t.identifier); }
+  }
+}
+canvas.addEventListener('touchstart', onTouchStart, { passive:false });
+canvas.addEventListener('touchmove', onTouchMove, { passive:false });
+canvas.addEventListener('touchend', onTouchEnd); canvas.addEventListener('touchcancel', onTouchEnd);
+function holdBtn(id, on, off){
+  const el=$(id);
+  el.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); on(); }, { passive:false });
+  el.addEventListener('touchend', e=>{ e.preventDefault(); off&&off(); }, { passive:false });
+  el.addEventListener('touchcancel', ()=>{ off&&off(); });
+  el.addEventListener('mousedown', e=>{ e.preventDefault(); on(); }); el.addEventListener('mouseup', ()=>{ off&&off(); });
+}
+holdBtn('tJump', ()=>input.jump=true, ()=>input.jump=false);
+holdBtn('tDown', ()=>input.down=true, ()=>input.down=false);
+holdBtn('tFly', toggleFly);
+holdBtn('tInv', openInventory);
+holdBtn('tPause', ()=>showMenu());
+
+// ---------------------------------------------------------------- menü
+const distEl=$('dist'), distVal=$('distVal');
+function showMenu(){
+  state='menu'; $('menu').classList.remove('hidden'); $('inv').classList.add('hidden'); $('touch').classList.add('hidden');
+  $('play').textContent = ready||pendingSpawn ? 'Devam et' : 'Oyna'; keys.clear(); input.jump=input.down=false; mouse.l=mouse.r=false;
+  if (ready) { saveEdits(); saveMeta(); }
+}
+function startPlay(){
+  initAudio(); state='play'; $('menu').classList.add('hidden');
+  if (isTouch){ $('touch').classList.remove('hidden'); try { document.documentElement.requestFullscreen?.().catch(()=>{}); } catch(e){} }
+  else lockPointer();
+  if (!started){ started=true; hint(isTouch?'Dokun: koy · Basılı tut: kır':'Sol tık: kır · Sağ tık: koy · E: bloklar'); }
+}
+let started=false;
+$('play').onclick=()=>{ const s=$('seed').value.trim()||seedStr; if (s!==seedStr) loadWorld(s,null); startPlay(); };
+$('newWorld').onclick=()=>{ const s=$('seed').value.trim()||randomSeed(); loadWorld(s,null); startPlay(); };
+distEl.oninput=()=>{ renderDist=+distEl.value; distVal.textContent=renderDist; lastCenter=''; for (const ch of chunks.values()) ch.dirty = ch.dirty || !ch.mesh; };
+$('keysDesk').classList.toggle('hidden',isTouch); $('keysTouch').classList.toggle('hidden',!isTouch);
+function randomSeed(){ const w=['bulut','vadi','yamaç','çınar','kum','dere','ova','kaya','koru','tepe']; return w[Math.floor(Math.random()*w.length)]+'-'+Math.floor(Math.random()*9000+1000); }
+let hintT=0; function hint(t){ const h=$('hint'); h.textContent=t; h.classList.remove('hidden'); h.style.opacity=1; clearTimeout(hintT); hintT=setTimeout(()=>h.style.opacity=0,3000); }
+
+// ---------------------------------------------------------------- başlat
+(function boot(){
+  let saved=null; try { saved=JSON.parse(store.get('kupdiyar.world')||'null'); } catch(e){}
+  if (saved && saved.hotbar && saved.hotbar.length===9) { hotbar=saved.hotbar.map(b=>PLACEABLE.includes(b)?b:B.DIRT); sel=saved.sel||0; }
+  if (saved && saved.dist) renderDist=saved.dist;
+  if (saved && typeof saved.time==='number') dayTime=saved.time;
+  distEl.value=renderDist; distVal.textContent=renderDist;
+  renderHotbar(); buildInventory();
+  if (saved && saved.seed) loadWorld(saved.seed, saved); else loadWorld(randomSeed(), null);
+})();
+
+addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); });
+
+let last=performance.now(), fpsAcc=0, fpsN=0, fps=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  fpsAcc+=dt; fpsN++; if (fpsAcc>0.5){ fps=Math.round(fpsN/fpsAcc); fpsAcc=0; fpsN=0; }
+  updateChunks(ready ? (isTouch?5:7) : 30);
+  if (!ready && chunkReadyAtPlayer()) finishSpawn();
+  $('loading').style.display = ready ? 'none' : 'block';
+  if (ready && state==='play'){
+    stepPlayer(dt);
+    if (mouse.l||mouse.r){ mouse.t-=dt; if (mouse.t<=0){ mouse.t=0.22; mouse.l?breakBlock():placeBlock(); } }
+    for (const L of touchLook.values()) if (L.breaking){ L.rep=(L.rep||0)+dt; if (L.rep>0.28){ L.rep=0; breakBlock(); } }
+  }
+  camera.position.set(player.pos.x, player.pos.y+EYE, player.pos.z);
+  camera.rotation.set(player.pitch, player.yaw, 0);
+  target = ready ? raycast(6) : null;
+  if (target){ selBox.visible=true; selBox.position.set(target.x+0.5,target.y+0.5,target.z+0.5); } else selBox.visible=false;
+  stepSky(state==='play'?dt:0); stepParticles(dt);
+  if (showInfo){
+    const p=player.pos;
+    $('info').textContent=`${fps} FPS\nX ${p.x.toFixed(1)}  Y ${p.y.toFixed(1)}  Z ${p.z.toFixed(1)}\nYığın ${Math.floor(p.x/CS)}, ${Math.floor(p.z/CS)} · ${chunks.size} yüklü\nTohum: ${seedStr}${player.fly?'\nUçuyor':''}`;
+  } else $('info').textContent='';
+  renderer.render(scene,camera);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
