@@ -43,6 +43,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0f1420;color:var(--te
 #inv .grid .slot{width:auto;height:56px;background:rgba(255,255,255,.05)}
 #inv .grid .slot canvas{width:40px;height:40px}
 #touch{position:fixed;inset:0;pointer-events:none}
+.row select{flex:1;min-width:0;padding:8px;border-radius:8px;border:1px solid var(--line);background:#141a2c;color:var(--text);font:14px system-ui,sans-serif}
+.row label{display:flex;align-items:center;gap:8px;cursor:pointer}
+#game.drag{cursor:grab}#game.drag.grabbing{cursor:grabbing}
 .tbtn{position:fixed;pointer-events:auto;width:64px;height:64px;border-radius:50%;background:rgba(20,26,44,.55);border:1px solid var(--line);
   color:var(--text);font:600 13px system-ui,sans-serif;display:grid;place-items:center;touch-action:none}
 .tbtn.on{background:rgba(255,207,74,.55);color:#1b1606}
@@ -89,11 +92,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0f1420;color:var(--te
     <div class="row"><span>Tohum</span><input type="text" id="seed" maxlength="32" spellcheck="false"></div>
     <button class="btn" id="newWorld">Bu tohumla yeni dünya</button>
     <div class="row"><span>Görüş</span><input type="range" id="dist" min="2" max="10" step="1"><span id="distVal"></span></div>
+    <div class="row" id="mouseRow"><span>Fare</span><select id="mouseMode"><option value="lock">Kilitli imleç (FPS)</option><option value="drag">Sürükleyerek bak</option></select></div>
+    <div class="row"><span>Hassasiyet</span><input type="range" id="sens" min="0.2" max="3" step="0.1"><span id="sensVal"></span></div>
+    <div class="row"><label><input type="checkbox" id="invertY"> Dikey bakışı ters çevir</label></div>
     <div class="keys" id="keysDesk">
       <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> yürü · <kbd>Boşluk</kbd> zıpla · <kbd>Shift</kbd> koş<br>
       <b>Sol tık</b> kır · <b>Sağ tık</b> koy · <b>Orta tık</b> bloğu seç<br>
       <kbd>1</kbd>–<kbd>9</kbd> / tekerlek: blok · <kbd>E</kbd> tüm bloklar<br>
-      <kbd>F</kbd> uçma (Boşluk yukarı, Shift aşağı) · <kbd>F3</kbd> bilgi · <kbd>Esc</kbd> duraklat
+      <kbd>F</kbd> uçma (Boşluk yukarı, Shift aşağı) · <kbd>F3</kbd> bilgi · <kbd>Esc</kbd> duraklat<br>
+      <b>Sürükleyerek bak</b> modunda: sol tuşla sürükle ve bak, tıkla ve kır, basılı tut ve sürekli kır
     </div>
     <div class="keys hidden" id="keysTouch">
       Sol yarı: sürükle ve yürü · Sağ yarı: sürükle ve bak<br>
@@ -119,7 +126,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0f1420;color:var(--te
 
 // ---------------------------------------------------------------- sabitler
 const CS = 16, CH = 80, SEA = 24, CA = CS * CS;
-const isTouch = matchMedia('(pointer:coarse)').matches || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+const isTouch = matchMedia('(pointer:coarse)').matches; // dokunmatik dizüstülerde fare çalışmaya devam eder
 const $ = id => document.getElementById(id);
 
 const store = {
@@ -647,7 +654,7 @@ $('invClose').onclick=closeInventory;
 
 // ---------------------------------------------------------------- kayıt
 function saveMeta(){
-  store.set('kupdiyar.world', JSON.stringify({ seed:seedStr, x:player.pos.x, y:player.pos.y, z:player.pos.z, yaw:player.yaw, pitch:player.pitch, fly:player.fly, time:dayTime, hotbar, sel, dist:renderDist }));
+  store.set('kupdiyar.world', JSON.stringify({ seed:seedStr, x:player.pos.x, y:player.pos.y, z:player.pos.z, yaw:player.yaw, pitch:player.pitch, fly:player.fly, time:dayTime, hotbar, sel, dist:renderDist, mouseMode, sens, invertY }));
 }
 function saveEdits(){
   if (!editsDirty) return; editsDirty=false;
@@ -712,24 +719,68 @@ function stepSky(dt){
 
 // ---------------------------------------------------------------- girdi: masaüstü
 let state='menu';
-function lockPointer(){ try { const p=canvas.requestPointerLock(); if (p && p.catch) p.catch(()=>{}); } catch(e){} }
-const mouse={ l:false, r:false, t:0 };
+let mouseMode='lock', sens=1, invertY=false, lockFails=0;
+const canLock = 'requestPointerLock' in canvas;
+function look(dx,dy,scale){
+  if (Math.abs(dx)>400||Math.abs(dy)>400) return;          // bazı tarayıcılarda kilit anındaki ani sıçramayı yok say
+  player.yaw-=dx*scale*sens; player.pitch-=dy*scale*sens*(invertY?-1:1);
+  player.pitch=Math.max(-1.55,Math.min(1.55,player.pitch));
+}
+function setMouseMode(m){
+  mouseMode=m; $('mouseMode').value=m;
+  canvas.classList.toggle('drag', m==='drag' && !isTouch);
+}
+function lockPointer(){
+  if (mouseMode!=='lock') return;
+  if (!canLock){ onLockFail(); return; }
+  try { const p=canvas.requestPointerLock(); if (p && p.catch) p.catch(()=>{}); } catch(e){ onLockFail(); }
+}
+function onLockFail(){
+  if (state!=='play' || isTouch) return;
+  lockFails++;
+  if (!canLock || window.self!==window.top || lockFails>=3){
+    setMouseMode('drag'); hint('İmleç kilitlenemedi: sürükleyerek bakma moduna geçildi');
+  } else hint('İmleci kilitlemek için tekrar tıkla');
+}
+document.addEventListener('pointerlockerror', onLockFail);
+const mouse={ l:false, r:false, t:0, drag:null };
 canvas.addEventListener('mousedown', e=>{
-  if (isTouch || state!=='play') return;
-  if (!document.pointerLockElement){ lockPointer(); return; }
-  if (e.button===0){ mouse.l=true; mouse.t=0.25; breakBlock(); }
+  if (state!=='play') return;
+  initAudio();
+  if (mouseMode==='lock' && document.pointerLockElement!==canvas){ lockPointer(); return; }
+  if (e.button===0){
+    if (mouseMode==='drag'){ mouse.drag={ x:e.clientX, y:e.clientY, t0:performance.now(), moved:false, holding:false }; canvas.classList.add('grabbing'); }
+    else { mouse.l=true; mouse.t=0.25; breakBlock(); }
+  }
   else if (e.button===2){ mouse.r=true; mouse.t=0.25; placeBlock(); }
   else if (e.button===1){ e.preventDefault(); pickBlock(); }
 });
-addEventListener('mouseup', e=>{ if (e.button===0) mouse.l=false; if (e.button===2) mouse.r=false; });
+addEventListener('mouseup', e=>{
+  if (e.button===0){
+    const d=mouse.drag;
+    if (d && !d.moved && !d.holding && state==='play') breakBlock();   // kısa tık: kır
+    mouse.drag=null; mouse.l=false; canvas.classList.remove('grabbing');
+  }
+  if (e.button===2) mouse.r=false;
+});
 addEventListener('contextmenu', e=>e.preventDefault());
 addEventListener('mousemove', e=>{
-  if (document.pointerLockElement!==canvas) return;
-  player.yaw-=e.movementX*0.0024; player.pitch-=e.movementY*0.0024;
-  player.pitch=Math.max(-1.55,Math.min(1.55,player.pitch));
+  if (state!=='play') return;
+  if (document.pointerLockElement===canvas) look(e.movementX,e.movementY,0.0024);
+  else if (mouse.drag){
+    look(e.movementX,e.movementY,0.004);
+    if (Math.hypot(e.clientX-mouse.drag.x,e.clientY-mouse.drag.y)>5) mouse.drag.moved=true;
+  }
 });
-addEventListener('wheel', e=>{ if (state==='play' && document.pointerLockElement) selectSlot(sel+(e.deltaY>0?1:-1)); }, { passive:true });
-document.addEventListener('pointerlockchange', ()=>{ if (!document.pointerLockElement && state==='play' && !isTouch) showMenu(); });
+function stepMouseHold(){
+  const d=mouse.drag;
+  if (d && !d.moved && !d.holding && performance.now()-d.t0>300){ d.holding=true; mouse.l=true; mouse.t=0.25; breakBlock(); }
+}
+addEventListener('wheel', e=>{ if (state==='play' && (document.pointerLockElement===canvas || mouseMode==='drag')) selectSlot(sel+(e.deltaY>0?1:-1)); }, { passive:true });
+document.addEventListener('pointerlockchange', ()=>{
+  if (document.pointerLockElement===canvas){ lockFails=0; return; }
+  if (state==='play' && mouseMode==='lock' && !isTouch) showMenu();
+});
 let showInfo=!isTouch;
 addEventListener('keydown', e=>{
   if (e.code==='KeyE' && state==='inv'){ closeInventory(); return; }
@@ -739,10 +790,11 @@ addEventListener('keydown', e=>{
   if (e.code==='KeyF') toggleFly();
   if (e.code==='KeyE') openInventory();
   if (e.code==='F3'){ e.preventDefault(); showInfo=!showInfo; }
+  if (e.code==='Escape' && !document.pointerLockElement) showMenu();
   if (e.code==='Space' || e.code.startsWith('Arrow')) e.preventDefault();
 });
 addEventListener('keyup', e=>keys.delete(e.code));
-addEventListener('blur', ()=>{ keys.clear(); mouse.l=mouse.r=false; });
+addEventListener('blur', ()=>{ keys.clear(); mouse.l=mouse.r=false; mouse.drag=null; });
 function toggleFly(){ player.fly=!player.fly; player.vel.y=0; updateFlyBtn(); hint(player.fly?'Uçma açık':'Uçma kapalı'); }
 function updateFlyBtn(){ $('tFly').classList.toggle('on',player.fly); $('tDown').classList.toggle('hidden',!player.fly); }
 
@@ -773,7 +825,7 @@ function onTouchMove(e){
     } else if (touchLook.has(t.identifier)){
       const L=touchLook.get(t.identifier), dx=t.clientX-L.x, dy=t.clientY-L.y; L.x=t.clientX; L.y=t.clientY;
       if (Math.hypot(t.clientX-L.sx,t.clientY-L.sy)>12) L.moved=true;
-      player.yaw-=dx*0.0055; player.pitch=Math.max(-1.55,Math.min(1.55,player.pitch-dy*0.0055));
+      look(dx,dy,0.0055);
     }
   }
 }
@@ -804,19 +856,23 @@ holdBtn('tPause', ()=>showMenu());
 const distEl=$('dist'), distVal=$('distVal');
 function showMenu(){
   state='menu'; $('menu').classList.remove('hidden'); $('inv').classList.add('hidden'); $('touch').classList.add('hidden');
-  $('play').textContent = ready||pendingSpawn ? 'Devam et' : 'Oyna'; keys.clear(); input.jump=input.down=false; mouse.l=mouse.r=false;
+  $('play').textContent = ready||pendingSpawn ? 'Devam et' : 'Oyna'; keys.clear(); input.jump=input.down=false; mouse.l=mouse.r=false; mouse.drag=null; canvas.classList.remove('grabbing');
   if (ready) { saveEdits(); saveMeta(); }
 }
 function startPlay(){
   initAudio(); state='play'; $('menu').classList.add('hidden');
   if (isTouch){ $('touch').classList.remove('hidden'); try { document.documentElement.requestFullscreen?.().catch(()=>{}); } catch(e){} }
   else lockPointer();
-  if (!started){ started=true; hint(isTouch?'Dokun: koy · Basılı tut: kır':'Sol tık: kır · Sağ tık: koy · E: bloklar'); }
+  if (!started){ started=true; hint(isTouch?'Dokun: koy · Basılı tut: kır':mouseMode==='drag'?'Sürükle: bak · Tıkla: kır · Sağ tık: koy':'Sol tık: kır · Sağ tık: koy · E: bloklar'); }
 }
 let started=false;
 $('play').onclick=()=>{ const s=$('seed').value.trim()||seedStr; if (s!==seedStr) loadWorld(s,null); startPlay(); };
 $('newWorld').onclick=()=>{ const s=$('seed').value.trim()||randomSeed(); loadWorld(s,null); startPlay(); };
 distEl.oninput=()=>{ renderDist=+distEl.value; distVal.textContent=renderDist; lastCenter=''; for (const ch of chunks.values()) ch.dirty = ch.dirty || !ch.mesh; };
+$('mouseMode').onchange=e=>{ setMouseMode(e.target.value); lockFails=0; };
+$('sens').oninput=e=>{ sens=+e.target.value; $('sensVal').textContent=sens.toFixed(1); };
+$('invertY').onchange=e=>{ invertY=e.target.checked; };
+$('mouseRow').classList.toggle('hidden',isTouch);
 $('keysDesk').classList.toggle('hidden',isTouch); $('keysTouch').classList.toggle('hidden',!isTouch);
 function randomSeed(){ const w=['bulut','vadi','yamaç','çınar','kum','dere','ova','kaya','koru','tepe']; return w[Math.floor(Math.random()*w.length)]+'-'+Math.floor(Math.random()*9000+1000); }
 let hintT=0; function hint(t){ const h=$('hint'); h.textContent=t; h.classList.remove('hidden'); h.style.opacity=1; clearTimeout(hintT); hintT=setTimeout(()=>h.style.opacity=0,3000); }
@@ -827,6 +883,10 @@ let hintT=0; function hint(t){ const h=$('hint'); h.textContent=t; h.classList.r
   if (saved && saved.hotbar && saved.hotbar.length===9) { hotbar=saved.hotbar.map(b=>PLACEABLE.includes(b)?b:B.DIRT); sel=saved.sel||0; }
   if (saved && saved.dist) renderDist=saved.dist;
   if (saved && typeof saved.time==='number') dayTime=saved.time;
+  if (saved && (saved.mouseMode==='lock'||saved.mouseMode==='drag')) mouseMode=saved.mouseMode;
+  if (saved && saved.sens>0) sens=saved.sens; if (saved) invertY=!!saved.invertY;
+  if (!canLock) mouseMode='drag';   // kilit desteklenmiyorsa baştan sürükleme modu
+  setMouseMode(mouseMode); $('sens').value=sens; $('sensVal').textContent=sens.toFixed(1); $('invertY').checked=invertY;
   distEl.value=renderDist; distVal.textContent=renderDist;
   renderHotbar(); buildInventory();
   if (saved && saved.seed) loadWorld(saved.seed, saved); else loadWorld(randomSeed(), null);
@@ -844,6 +904,7 @@ function frame(now){
   $('loading').style.display = ready ? 'none' : 'block';
   if (ready && state==='play'){
     stepPlayer(dt);
+    stepMouseHold();
     if (mouse.l||mouse.r){ mouse.t-=dt; if (mouse.t<=0){ mouse.t=0.22; mouse.l?breakBlock():placeBlock(); } }
     for (const L of touchLook.values()) if (L.breaking){ L.rep=(L.rep||0)+dt; if (L.rep>0.28){ L.rep=0; breakBlock(); } }
   }

@@ -62,3 +62,5 @@ cd kupdiyar && python3 -m http.server 8081
 | Kır / koy | Sol tık / sağ tık | Basılı tut / dokun |
 | Blok seç | 1–9, tekerlek, orta tık, E | Alt çubuk, ▦ |
 | Uçma | F (Boşluk yukarı, Shift aşağı) | Uç düğmesi (Zıpla / İn) |
+
+**Fare modları** (menüden seçilir): *Kilitli imleç*, klasik FPS kontrolüdür; fare hareketi doğrudan bakışı döndürür. *Sürükleyerek bak* modunda sol tuşla sürükleyince bakış döner, tıklayınca blok kırılır, basılı tutunca sürekli kırılır. İmleç kilitlenemezse (örneğin oyun bir iframe ya da önizleme içindeyse) oyun bu moda kendisi geçer. Menüden fare hassasiyeti ve dikey bakış yönü de ayarlanabilir.
